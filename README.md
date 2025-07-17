@@ -1,4 +1,4 @@
-# GrassMarlin Lite
+# pyLot
 
 A lightweight network traffic analyzer for industrial control systems (ICS) protocols.
 
