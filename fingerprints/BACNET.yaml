@@ -1,0 +1,99 @@
+fingerprint:
+  header:
+    name:
+      _text: BACNET
+    author:
+      _text: Default
+    description:
+      _text: Finds BACNET traffic and attemps to extract the Device Name and Number.
+  filter:
+    for: BACNET
+    name: Dst/Src
+    dstport:
+      _text: '47808'
+    srcport:
+      _text: '47808'
+  payload:
+    for: BACNET
+    description:
+      _text: Tags BACNET traffic
+    always:
+      return:
+        direction: SOURCE
+        confidence: '1'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: BACNET
+    match:
+    - offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: '1007'
+      andthen:
+        bytejump:
+          postoffset: '0'
+          relative: 'false'
+          endian: BIG
+          offset: '9'
+          bytes: '1'
+          andthen:
+            return:
+              direction: SOURCE
+              confidence: '1'
+              details:
+                category:
+                  _text: ICS_HOST
+                role:
+                  _text: SERVER
+              extract:
+                name: Device Name
+                from: '10'
+                to: CURSOR_MAIN
+                maxlength: '256'
+                endian: BIG
+                post:
+                  lookup: BACNET
+    - offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 1000C40200
+      andthen:
+        anchor:
+          cursor: END
+          position: START_OF_PAYLOAD
+          relative: 'true'
+          offset: '2'
+        return:
+          direction: SOURCE
+          confidence: '1'
+          details:
+            category:
+              _text: ICS_HOST
+            role:
+              _text: CLIENT
+            detail:
+              name: ICSProtocol
+              _text: BACNET
+          extract:
+            name: Device ID
+            from: CURSOR_MAIN
+            to: CURSOR_END
+            maxlength: '2'
+            endian: BIG
+            post:
+              convert: INTEGER

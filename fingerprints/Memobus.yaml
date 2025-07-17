@@ -1,0 +1,25 @@
+fingerprint:
+  header:
+    name:
+      _text: Memobus
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Memobus traffic.
+  filter:
+    for: Memobus
+    name: Yashawa MP Series Controllers
+    dstport:
+      _text: '502'
+  payload:
+    for: Memobus
+    description:
+      _text: Alternative for those who require a non-ieController
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Product
+            _text: Memobus

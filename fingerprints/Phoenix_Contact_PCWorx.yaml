@@ -1,0 +1,30 @@
+fingerprint:
+  header:
+    name:
+      _text: Phoenix Contact PCWorx
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Phoenix contact data traffic.
+  filter:
+    for: PCWorx
+    name: ENGINEERING WORKSTATION 1962
+    dstport:
+      _text: '1962'
+  payload:
+    for: PCWorx
+    description:
+      _text: Looks for PCWorx data communication of engineering workstation over the
+        port specified.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: WORKSTATION
+          role:
+            _text: ENGINEER
+          detail:
+            name: Product
+            _text: PCWorx

@@ -1,0 +1,72 @@
+fingerprint:
+  header:
+    name:
+      _text: MODBUS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of MODBUS traffic on port 502.
+  filter:
+  - for: TCP Slave Unit Number
+    name: TCP Slave
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '502'
+  - for: UDP Client/Server Unit Number
+    name: UDP Client/Server
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '502'
+  - for: TCP Master
+    name: TCP Master
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '502'
+  payload:
+  - for: TCP Master
+    description:
+      _text: MODBUS TCP Master
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: MTU
+          role:
+            _text: MASTER
+          detail:
+            name: ICSProtocol
+            _text: MODBUS
+  - for: UDP Client/Server Unit Number
+    description:
+      _text: MODBUS UDP Client or Server
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: MODBUS
+  - for: TCP Slave Unit Number
+    description:
+      _text: MODBUS TCP Slave Unit Number
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SLAVE
+          detail:
+            name: ICSProtocol
+            _text: MODBUS
+        extract:
+          name: Unit
+          from: '6'
+          to: '7'

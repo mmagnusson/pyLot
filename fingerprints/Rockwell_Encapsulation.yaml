@@ -1,0 +1,31 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell Encapsulation
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Rockwell Encapsulation traffic.
+  filter:
+  - for: Encapsulation
+    name: Src
+    srcport:
+      _text: '44818'
+  - for: Encapsulation
+    name: Dst
+    dstport:
+      _text: '44818'
+  payload:
+    for: Encapsulation
+    description:
+      _text: Rockwell encapsulation that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Encapsulation

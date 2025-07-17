@@ -1,0 +1,46 @@
+fingerprint:
+  header:
+    name:
+      _text: Factory
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Factory Talk Event Server
+        traffic.This fingerprint looks for the evidence of Factory Talk Directory
+        Server File transfer traffic.This fingerprint looks for the evidence of Factory
+        Talk Directory Server traffic.
+  filter:
+  - for: ' Talk Event Server'
+    srcport:
+      _text: '7700'
+  - for: ' Talk Directory Server File Transfer'
+    dstport:
+      _text: '3060'
+  - for: ' Talk Directory Server'
+    srcport:
+      _text: '7710'
+  payload:
+  - for: ' Talk Event Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: FT-EVENT-SERV
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Talk Directory Server File Transfer'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: RNADIRFT
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Talk Directory Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: FT-DIR-SERV
+          from: CURSOR_START
+          to: CURSOR_END

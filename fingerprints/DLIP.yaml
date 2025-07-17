@@ -1,0 +1,44 @@
+fingerprint:
+  header:
+    name:
+      _text: DLIP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of DLIP traffic.
+  filter:
+  - for: DLIP Src
+    name: DLIP Src
+    srcport:
+      _text: '7201'
+  - for: DLIP Dst
+    name: DLIP Dst
+    dstport:
+      _text: '7201'
+  payload:
+  - for: DLIP Src
+    description:
+      _text: Tags Intelligent Data Acquisition and Control
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: DLIP
+  - for: DLIP Dst
+    description:
+      _text: Tags Intelligent Data Acquisition and Control
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: DLIP

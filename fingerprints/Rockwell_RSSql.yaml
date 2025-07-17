@@ -1,0 +1,70 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell RSSql
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Rockwell RSSql Transaction Manager,
+        Compression Server, and Configuration Server traffic.
+  filter:
+  - for: RSSql Transaction Manager
+    name: RSSql Transaction
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '400'
+  - for: RSSql Compression Server
+    name: RSSql Compression
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '401'
+  - for: RSSql Configuration Server
+    name: RSSql Configuration
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '402'
+  payload:
+  - for: RSSql Transaction Manager
+    description:
+      _text: Rockwell RSSql transaction that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell RSSql Transaction Manager
+  - for: RSSql Compression Server
+    description:
+      _text: Rockwell RSSql compression server that tags the source and destination
+        ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell RSSql Compression Server
+  - for: RSSql Configuration Server
+    description:
+      _text: Rockwell RSSql Configuration server that tags the source and destination
+        ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell RSSql Configuration Server

@@ -1,0 +1,25 @@
+fingerprint:
+  header:
+    name:
+      _text: Extensible Automation
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Extensible Automation traffic.
+  filter:
+    for: Extensible Automation
+    name: xAP-HA
+    dstport:
+      _text: '3639'
+  payload:
+    for: Extensible Automation
+    description:
+      _text: Supports integration of telemetry and control devices for building automation
+    always:
+      return:
+        confidence: '5'
+        category:
+          _text: ICS_HOST
+        detail:
+          name: ICSProtocol
+          _text: xAP-HA

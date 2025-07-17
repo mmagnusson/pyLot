@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Fatek
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of the FATEK FB Series traffic.
+  filter:
+    for: FB Series
+    name: FB Series
+    dstport:
+      _text: '500'
+  payload:
+    for: FB Series
+    description:
+      _text: Identifies Fatek FB series PLC traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          detail:
+            name: Product
+            _text: Fatek FB Series

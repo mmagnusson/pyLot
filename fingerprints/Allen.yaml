@@ -1,0 +1,100 @@
+fingerprint:
+  header:
+    name:
+      _text: Allen
+    author:
+      _text: Default
+    description:
+      _text: "This is the response seen from a device running an Allen Bradley specific\
+        \ web server and providing its device description via a web page. \nThis is\
+        \ evidence of some sort of Allen Bradley Intelligent Electronic Device (IED).\
+        \ \n\tThis is the response seen from a device running an Allen Bradley specific\
+        \ web server. \"Server: A-B WWW/0.1\" \nThis is evidence of some sort of Allen\
+        \ Bradley Intelligent Electronic Device (IED). \n\tThis is the response seen\
+        \ from a device running an Allen Bradley specific web server and providing\
+        \ its device name via a web page. \nThis is evidence of some sort of Allen\
+        \ Bradley Intelligent Electronic Device (IED)."
+  filter:
+  - for: ' Bradley Web Server Device Description'
+    transportprotocol:
+      _text: '6'
+    ethertype:
+      _text: '2048'
+    srcport:
+      _text: '80'
+  - for: ' Bradley Web Server'
+    transportprotocol:
+      _text: '6'
+    ethertype:
+      _text: '2048'
+    srcport:
+      _text: '80'
+  - for: ' Bradley Web Server Device Name'
+    transportprotocol:
+      _text: '6'
+    ethertype:
+      _text: '2048'
+    srcport:
+      _text: '80'
+  payload:
+  - for: ' Bradley Web Server Device Description'
+    match:
+      offset: '0'
+      movecursors: 'true'
+      pattern:
+        _text: Description</td><td>
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              confidence: '4'
+              extract:
+                name: Version
+                from: CURSOR_START
+                to: CURSOR_END
+  - for: ' Bradley Web Server'
+    match:
+      offset: '17'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 5365727665723A20412D42205757572F302E310D0A
+      andthen:
+        return:
+          confidence: '4'
+          extract:
+            name: Allen Bradley
+            from: CURSOR_START
+            to: CURSOR_END
+  - for: ' Bradley Web Server Device Name'
+    match:
+      offset: '184'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 73733D52363E446576696365204E616D653C2F74643E3C74643E
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              confidence: '4'
+              extract:
+                name: Model
+                from: '210'
+                to: CURSOR_END

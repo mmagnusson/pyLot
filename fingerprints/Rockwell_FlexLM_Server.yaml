@@ -1,0 +1,222 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell FlexLM Server
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of FlexLM server traffic.
+    tag:
+      _text: Original
+  filter:
+  - for: FlexLM Server 1
+    name: Server 1
+    dstport:
+      _text: '27000'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 2
+    name: Server 2
+    dstport:
+      _text: '27001'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 3
+    name: Server 3
+    dstport:
+      _text: '27002'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 4
+    name: Server 4
+    dstport:
+      _text: '27003'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 5
+    name: Server 5
+    dstport:
+      _text: '27004'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 6
+    name: Server 6
+    dstport:
+      _text: '27005'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 7
+    name: Server 7
+    dstport:
+      _text: '27006'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 8
+    name: Server 8
+    dstport:
+      _text: '27007'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 9
+    name: Server 9
+    dstport:
+      _text: '27008'
+    transportprotocol:
+      _text: '6'
+  - for: FlexLM Server 10
+    name: Server 10
+    dstport:
+      _text: '27009'
+    transportprotocol:
+      _text: '6'
+  payload:
+  - for: FlexLM Server 1
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 2
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 3
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 4
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 5
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 6
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 7
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 8
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 9
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server
+  - for: FlexLM Server 10
+    description:
+      _text: Rockwell FlexLM Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FlexLM Server

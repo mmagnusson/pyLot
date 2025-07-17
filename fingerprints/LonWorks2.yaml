@@ -1,0 +1,19 @@
+fingerprint:
+  header:
+    name:
+      _text: LonWorks2
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of LonWorks2 traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    dstport:
+      _text: '2541'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '3'

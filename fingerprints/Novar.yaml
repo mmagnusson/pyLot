@@ -1,0 +1,60 @@
+fingerprint:
+  header:
+    name:
+      _text: Novar
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Novar Alarm traffic. This fingerprint
+        looks for evidence of Novar Global traffic. This fingerprint looks for evidence
+        of Novar Data traffic.
+  filter:
+  - for: Novar Alarm
+    name: Alarm
+    srcport:
+      _text: '23401'
+  - for: Novar Global
+    name: Global
+    srcport:
+      _text: '23402'
+  - for: Novar Data
+    name: Data
+    srcport:
+      _text: '23400'
+  payload:
+  - for: Novar Alarm
+    description:
+      _text: This fingerprint looks for evidence of Novar Alarm traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Novar Alarm
+  - for: Novar Global
+    description:
+      _text: This fingerprint looks for evidence of Novar Global traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Novar Global
+  - for: Novar Data
+    description:
+      _text: This fingerprint looks for evidence of Novar Data traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Novar Data

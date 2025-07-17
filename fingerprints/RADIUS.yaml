@@ -1,0 +1,45 @@
+fingerprint:
+  header:
+    name:
+      _text: RADIUS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of RADIUS services including internet
+        authentication and accounting.
+  filter:
+  - for: RADIUS Authentication
+    name: Authentication
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '1812'
+  - for: RADIUS Accounting
+    name: Accounting
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '1813'
+  payload:
+  - for: RADIUS Authentication
+    description:
+      _text: Tags RADIUS authentication internet service
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Micrsoft Server Product
+            _text: RADIUS-Authentication
+  - for: RADIUS Accounting
+    description:
+      _text: Tags RADIUS accounting internet service.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Micrsoft Server Product
+            _text: RADIUS - Accounting

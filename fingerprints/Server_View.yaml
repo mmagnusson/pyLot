@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Server View
+    author:
+      _text: Default
+    description:
+      _text: This tries to find Server view dmbs access traffic.
+  filter:
+    for: Server View
+    name: DBMS Access
+    srcport:
+      _text: '9212'
+  payload:
+    for: Server View
+    description:
+      _text: Tags the DBMS access from Server View.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Server View DBMS access

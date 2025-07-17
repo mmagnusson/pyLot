@@ -1,0 +1,23 @@
+fingerprint:
+  header:
+    name:
+      _text: RSVIEWSE HMI Activation
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of RSViewSE HMI Activation traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    srcport:
+      _text: '7722'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: RSVIEWSE-ACT
+          from: CURSOR_START
+          to: CURSOR_END

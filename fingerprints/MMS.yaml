@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: MMS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Microsoft media Server as part
+        of a service.
+  filter:
+    for: MMS
+    name: MMS
+    dstport:
+      _text: '1755'
+  payload:
+    for: MMS
+    description:
+      _text: Tags Microsoft Media Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Micrsoft Server Product
+            _text: Microsoft Media Server

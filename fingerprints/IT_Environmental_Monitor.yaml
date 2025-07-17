@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: IT Environmental Monitor
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of IT Environmental Monitor traffic.
+  filter:
+    for: Item Service
+    name: DstPort
+    dstport:
+      _text: '3848'
+  payload:
+    for: Item Service
+    description:
+      _text: Gateway Server for industrial devices running CodeSys programming interface.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: IT Environmental Monitor

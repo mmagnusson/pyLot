@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: I-NET 2000-NPR
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of I/NET 2000-NPR traffic.
+  filter:
+    for: I-NET 2000-NPR
+    name: DstPort
+    dstport:
+      _text: '5069'
+  payload:
+    for: I-NET 2000-NPR
+    description:
+      _text: This fingerprint looks for the evidence of I/NET 2000-NPR traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: I-NET 2000-NPR

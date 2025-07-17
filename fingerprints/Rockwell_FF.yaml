@@ -1,0 +1,83 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell FF
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of FF LAN Redundancy Port traffic.
+        This fingerprint looks for evidence of FF Fieldbus traffic. This fingerprint
+        looks for evidence of FF System Management traffic. This fingerprint looks
+        for evidence of FF Annunciation traffic.
+  filter:
+  - for: LAN Redundancy Port
+    name: LAN Redundancy
+    dstport:
+      _text: '3622'
+  - for: Fieldbus Message Specification
+    name: Fieldbus Message Specification
+    dstport:
+      _text: '1090'
+  - for: System Management
+    name: System Management
+    dstport:
+      _text: '1091'
+  - for: Annunciation
+    name: Annunciation
+    dstport:
+      _text: '1089'
+  payload:
+  - for: LAN Redundancy Port
+    description:
+      _text: Rockwell LAN Redundancy payload that tags the source port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell FF-LR-PORT
+  - for: Fieldbus Message Specification
+    description:
+      _text: Rockwell Fieldbus Message Specification payload that tags the source
+        and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell FF-FMS
+  - for: System Management
+    description:
+      _text: Rockwell System Management payload that tags the source and destination
+        ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell FF-SM
+  - for: Annunciation
+    description:
+      _text: Rockwell Annuciation payload that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell FF-ANNUNC

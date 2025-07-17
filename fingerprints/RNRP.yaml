@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: RNRP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of RNRP traffic.
+  filter:
+    for: Redundant Network Routing
+    name: RNRP
+    dstport:
+      _text: '2423'
+  payload:
+    for: Redundant Network Routing
+    description:
+      _text: Tags RNRP TCP/UDP destination port
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: RNRP

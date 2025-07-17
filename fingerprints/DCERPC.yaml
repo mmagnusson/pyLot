@@ -1,0 +1,55 @@
+fingerprint:
+  header:
+    name:
+      _text: DCERPC
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of DCERPC traffic which is a specificiation
+        for a remote call that defines both APIs and an over-the-network protocol.
+        A DCE/RPC server's endpoint mapper (EPMAP) will listen for incoming calls.
+        A client will call this endpoint mapper and ask for a specific interface,
+        which will be accessed on a different connection.
+  filter:
+    for: DCERPC
+    name: DCERPC
+    dstport:
+      _text: '135'
+  payload:
+    for: DCERPC
+    description:
+      _text: Tags the CTX data item under the DCE/RPC payload
+    match:
+      offset: '28'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 00000100C4
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details:
+            detail:
+              name: Microsoft Server Product
+              _text: DCE/RPC
+          extract:
+          - name: IOXIDResolver UUID
+            from: '32'
+            to: '48'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+          - name: NDR UUID
+            from: '52'
+            to: '68'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX

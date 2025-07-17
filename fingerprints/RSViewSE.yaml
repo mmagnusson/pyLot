@@ -1,0 +1,33 @@
+fingerprint:
+  header:
+    name:
+      _text: RSViewSE
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of RSviewSE HMI Server traffic.This
+        fingerprint looks for the evidence of RSViewSE Server Framework traffic.
+  filter:
+  - for: ' HMI Server'
+    srcport:
+      _text: '7720'
+  - for: ' Server Framework'
+    srcport:
+      _text: '7721'
+  payload:
+  - for: ' HMI Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: RSVIEWSE-HMI
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Server Framework'
+    always:
+      return:
+        confidence: '2'
+        extract:
+          name: RSVIEWSE-FRAM
+          from: CURSOR_START
+          to: CURSOR_END

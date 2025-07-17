@@ -1,0 +1,36 @@
+fingerprint:
+  header:
+    name:
+      _text: LS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of LS GLOFA FEnet traffic over 2004.
+        This fingerprint identifies evidence of LS XGB fenet over 2004. This fingerprint
+        identifies evidence of LS XGK FEnet over 2004.
+  filter:
+  - for: LS
+    name: GLOFA FEnet
+    dstport:
+      _text: '2004'
+  - for: LS
+    name: XGB FEnet
+    dstport:
+      _text: '2004'
+  - for: LS
+    name: XGK FEnet
+    dstport:
+      _text: '2004'
+  payload:
+    for: LS
+    description:
+      _text: PLCs with built in master/slave capability via MODBUS. Depending on the
+        PLC, the device can handle high processing in large networks.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ICSProtocol
+            _text: Koyo Ethernet

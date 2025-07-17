@@ -1,0 +1,42 @@
+fingerprint:
+  header:
+    name:
+      _text: RTP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of real time streaming communicating
+        with media servers in conjunction with real time control protocol for media
+        delivery.
+  filter:
+  - for: RTSP
+    name: Streaming Protocol
+    dstport:
+      _text: '554'
+  - for: RTP
+    name: Time Transport
+    dstport:
+      _text: '5004'
+  payload:
+  - for: RTSP
+    description:
+      _text: Real time streaming protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: RTSP
+  - for: RTP
+    description:
+      _text: Real Time Transport
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Micosoft Server Product
+            _text: RTP

@@ -1,0 +1,39 @@
+fingerprint:
+  header:
+    name:
+      _text: SEL-351A Device Info From ID Cmd
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint pulls out the version info transmitted from a SEL-351A
+        ID command over telnet.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    transportprotocol:
+      _text: '6'
+    ethertype:
+      _text: '2048'
+    srcport:
+      _text: '23'
+  payload:
+    for: default
+    match:
+      offset: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 49440D0A020D0A224649443D
+      andthen:
+        anchor:
+        - cursor: START
+          offset: '12'
+        - cursor: END
+          offset: '46'
+        return:
+          confidence: '5'
+          extract:
+            name: Version
+            from: '12'
+            to: CURSOR_END

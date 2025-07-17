@@ -1,0 +1,85 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell RSViewSE
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of RSviewSE HMI Server traffic. This
+        fingerprint looks for evidence of RSViewSE Server Framework traffic. This
+        fingerprint looks for evidence of RSViewSE HMI Activation traffic. This fingerprint
+        looks for evidence of RSViewSE Directory Serve traffic.
+  filter:
+  - for: HMI Server
+    name: HMI Server
+    srcport:
+      _text: '7720'
+  - for: Server Framework
+    name: Server Framework
+    srcport:
+      _text: '7721'
+  - for: HMI Activation
+    name: HMI Activation
+    srcport:
+      _text: '7721'
+  - for: Directory Server
+    name: Directory Server
+    srcport:
+      _text: '7721'
+  payload:
+  - for: HMI Server
+    description:
+      _text: Rockwell FactoryTalk RSView SE HMI Server
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSView SE HMI Server
+  - for: Server Framework
+    description:
+      _text: Rockwell FactoryTalk RSView SE Server Framework
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSView SE Server Framework
+  - for: HMI Activation
+    description:
+      _text: Rockwell FactoryTalk RSView SE HMI Activation
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: OTHER
+          detail:
+            name: Product
+            _text: Rockwell HMI Activation
+  - for: Directory Server
+    description:
+      _text: Rockwell FactoryTalk RSView SE Directory Server
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell Directory Server

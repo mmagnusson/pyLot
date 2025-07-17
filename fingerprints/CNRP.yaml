@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: CNRP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of CNRP traffic
+  filter:
+    for: Common Name Resolution Protocol
+    name: DstPort
+    dstport:
+      _text: '2757'
+  payload:
+    for: Common Name Resolution Protocol
+    description:
+      _text: Tags the Common Name Resolution Protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Name Resolution Protocol
+            _text: Common Name Resolution Protocol

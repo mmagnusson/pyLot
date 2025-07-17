@@ -1,0 +1,23 @@
+fingerprint:
+  header:
+    name:
+      _text: Invensys Sigma Port
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Invensys Sigma Port traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    dstport:
+      _text: '3614'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: SIGMA-PORT
+          from: CURSOR_START
+          to: CURSOR_END

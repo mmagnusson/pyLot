@@ -1,0 +1,156 @@
+fingerprint:
+  header:
+    name:
+      _text: GE
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of GE 9030 devices. This fingerprint
+        identifies evidence of engineering workstations for GE 9030 devices. This
+        fingerprint identifies evidence of GE Industrial Solution SRTP Data traffic.
+        This fingerprint identifies evidence of Ethernet Global Data traffic.
+  filter:
+  - for: 9030 Device
+    name: Device
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '18245'
+  - for: 9030 Engineering workstation
+    name: Engineering workstation
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '18245'
+  - for: GE-SRTP 18245
+    name: '18245'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '18245'
+  - for: GE-SRTP 18246
+    name: '18246'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '18246'
+  - for: Producer/Consumer
+    name: Producer/Consumer
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '18246'
+  - for: Command Service
+    name: Service
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '7937'
+  - for: QuickPanels
+    name: QuickPanels
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '57176'
+  payload:
+  - for: 9030 Device
+    description:
+      _text: PLC GE9030 device
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          role:
+            _text: SLAVE
+  - for: 9030 Engineering workstation
+    description:
+      _text: Engineering workstation for GE9030
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: '0200'
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details:
+            category:
+              _text: WORKSTATION
+            role:
+              _text: ENGINEER
+  - for: GE-SRTP 18245
+    description:
+      _text: The protocol was developed by GE Intelligent Platforms after GE Fanuc
+        to tranfer data of PLCs
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: GE-STRP
+  - for: GE-SRTP 18246
+    description:
+      _text: The protocol was developed by GE Intelligent Platforms after GE Fanuc
+        to tranfer data of PLCs
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: GE-STRP
+  - for: Producer/Consumer
+    description:
+      _text: The EGD supports both the producer/consumer service port and the command
+        service port using UDP over an IP network.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ICSProtocol
+            _text: GE Fanuc EGD Producer/Consumer
+  - for: Command Service
+    description:
+      _text: The EGD supports both the producer/consumer service port and the command
+        service port using UDP over an IP network.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ICSProtocol
+            _text: GE Fanuc EGD Command Service
+  - for: QuickPanels
+    description:
+      _text: Multi functional interface that integrates process control, views, runs
+        data historian communication.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: GE Fanuc QuickPanels

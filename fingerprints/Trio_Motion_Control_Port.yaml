@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Trio Motion Control
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Trio Motion Control Port traffic.
+  filter:
+    for: Trio Motion Control
+    name: DstPort
+    dstport:
+      _text: '3240'
+  payload:
+    for: Trio Motion Control
+    description:
+      _text: Tags Trio Motion Control port traffic by destination port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Trio Motion Control

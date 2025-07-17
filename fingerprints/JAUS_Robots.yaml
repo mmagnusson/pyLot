@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: JAUS Robots
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of JAUS Robots traffic.
+  filter:
+    for: JAUS Robots
+    name: DstPort
+    dstport:
+      _text: '3794'
+  payload:
+    for: JAUS Robots
+    description:
+      _text: This fingerprint looks for evidence of JAUS Robots traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: JAUS Robots

@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: IMAP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of communication between the exchange
+        server.
+  filter:
+    for: IMAP
+    name: IMAP
+    dstport:
+      _text: '143'
+  payload:
+    for: IMAP
+    description:
+      _text: Tags IMAP exchange server communication used to manage email server/receive
+        email.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: IMAP

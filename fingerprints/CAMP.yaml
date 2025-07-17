@@ -1,0 +1,29 @@
+fingerprint:
+  header:
+    name:
+      _text: CAMP
+    author:
+      _text: Default
+    description:
+      _text: Possible indication of command/response from CAMP. When a CAMP command
+        is sent to another node, reponse is expected. This allows the application
+        to determine whether a command was sucessfully completed.
+  filter:
+    for: Common ASCII Message Protocol
+    name: DstPort
+    dstport:
+      _text: '4450'
+  payload:
+    for: Common ASCII Message Protocol
+    description:
+      _text: Tags the Common ASCII Message Protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Message Protocol
+            _text: Common ASCII Message Protocol

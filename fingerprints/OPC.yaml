@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: OPC
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of OPC traffic. OPC is a series
+        of standard specifications designed to simplify integration of various forms
+        of data on systems from different vendors.
+  filter:
+    for: OLE for Process Control
+    name: OPC
+    dstport:
+      _text: '135'
+  payload:
+    for: OLE for Process Control
+    description:
+      _text: Devices running OPC client trying to connect an OPC server on a different
+        computer would reply on DCOM for the communication.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: OPC

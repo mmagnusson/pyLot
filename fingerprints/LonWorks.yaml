@@ -1,0 +1,36 @@
+fingerprint:
+  header:
+    name:
+      _text: LonWorks
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of LonWorks traffic.
+  filter:
+  - for: LonWorks 1
+    name: DstPort
+    dstport:
+      _text: '2540'
+  - for: LonWorks 2
+    name: DstPort
+    dstport:
+      _text: '2541'
+  payload:
+  - for: LonWorks 1
+    always:
+      return:
+        confidence: '5'
+        category:
+          _text: ICS_HOST
+        detail:
+          name: ICSProtocol
+          _text: LonWorks
+  - for: LonWorks 2
+    always:
+      return:
+        confidence: '5'
+        category:
+          _text: ICS_HOST
+        detail:
+          name: ICSProtocol
+          _text: LonWorks

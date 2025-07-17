@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: ASP.Net
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of session states that stores data
+        out of process.
+  filter:
+    for: ASP.Net
+    name: State Service
+    dstport:
+      _text: '42424'
+  payload:
+    for: ASP.Net
+    description:
+      _text: Payload supports asp.net state service
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: ASP.NET

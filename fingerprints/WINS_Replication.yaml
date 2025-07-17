@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: WINS Replication
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of windows internet naming service
+        that enables NetBIOS name resolution.
+  filter:
+    for: WINS
+    name: Replication
+    dstport:
+      _text: '42'
+  payload:
+    for: WINS
+    description:
+      _text: Tags WINS server that is communicating with network clients using NetBIOS
+        name resolution
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: WINS Replication

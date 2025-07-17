@@ -1,0 +1,182 @@
+fingerprint:
+  header:
+    name:
+      _text: APOGEE
+    author:
+      _text: Default
+    description:
+      _text: This is finding the version number of the device in the APOGEE networkThis
+        identifies a AEM (APOGEE Ethernet Microserver). This is finding the hardware
+        type of the device in the APOGEE networkThis is finding the hardware type
+        of the device in the APOGEE networkThis is finding the last link date of the
+        device in the APOGEE network
+  filter:
+  - for: ' Network-Version Number'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: ' device'
+    srcport:
+      _text: '3001'
+  - for: ' Network-Hardware Type'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: ' Network-Panel Name'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: ' Network-Link Date'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  payload:
+  - for: ' Network-Version Number'
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C56657273696F6E4E756D6265723E
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                detail:
+                  name: Role
+                  _text: SERVER
+              extract:
+                name: Version
+                from: CURSOR_START
+                to: CURSOR_END
+  - for: ' device'
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 41706F676565
+      andthen:
+        return:
+          confidence: '3'
+          details:
+            category:
+              _text: ICS_HOST
+            detail:
+              name: Role
+              _text: OTHER
+  - for: ' Network-Hardware Type'
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C4861726477617265547970653E
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                detail:
+                  name: Role
+                  _text: SERVER
+              extract:
+                name: Model
+                from: CURSOR_START
+                to: CURSOR_END
+  - for: ' Network-Panel Name'
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C50616E656C204E616D653D22
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: '22'
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                detail:
+                  name: Role
+                  _text: SERVER
+              extract:
+                name: 'Panel Name: '
+                from: CURSOR_START
+                to: CURSOR_END
+  - for: ' Network-Link Date'
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C4C696E6B446174653E
+      andthen:
+        match:
+          relative: 'true'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                detail:
+                  name: Role
+                  _text: SERVER
+              extract:
+                name: 'Link Date:'
+                from: CURSOR_START
+                to: CURSOR_END

@@ -1,0 +1,69 @@
+fingerprint:
+  header:
+    name:
+      _text: FactoryTalk
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of FactoryTalk Alarming  traffic.This
+        fingerprint looks for the evidence of FactoryTalk Object RPC traffic.This
+        fingerprint looks for the evidence of Factory Talk Event Multiplexor traffic.This
+        fingerprint looks for the evidence of FactoryTalk Service control traffic.This
+        fingerprint looks for the evidence of FactoryTalk Server Health traffic.
+  filter:
+  - for: ' Alarming Server'
+    dstport:
+      _text: '6543'
+  - for: ' Object RPC'
+    dstport:
+      _text: '1330'
+  - for: ' Event Multiplexor'
+    dstport:
+      _text: '7600'
+  - for: ' Service control'
+    dstport:
+      _text: '1331'
+  - for: ' Server Health'
+    dstport:
+      _text: '1332'
+  payload:
+  - for: ' Alarming Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: RNA-ALARM-SERV
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Object RPC'
+    always:
+      return:
+        confidence: '2'
+        extract:
+          name: RNAORPC
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Event Multiplexor'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: FT-EVENT-MULTI
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Service control'
+    always:
+      return:
+        confidence: '2'
+        extract:
+          name: RNASERV
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Server Health'
+    always:
+      return:
+        confidence: '2'
+        extract:
+          name: RNASERVERPING
+          from: CURSOR_START
+          to: CURSOR_END

@@ -1,0 +1,31 @@
+fingerprint:
+  header:
+    name:
+      _text: S7Comm
+    author:
+      _text: Default
+    description:
+      _text: "ISO 8073 COTP 020f80 \nprotocol usually rides on port 102\n\ns7 communication\
+        \ 32 is the protocol id\n\n020f80 32"
+    tag:
+      _text: Original
+  filter:
+    for: default
+    dstport:
+      _text: '102'
+  payload:
+    for: default
+    match:
+      offset: '0'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 02F0803201
+      andthen:
+        return:
+          confidence: '3'
+          extract:
+            name: Siemens
+            from: CURSOR_START
+            to: CURSOR_END

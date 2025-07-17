@@ -1,0 +1,67 @@
+fingerprint:
+  header:
+    name:
+      _text: SNMP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of the Simple Network Management
+        Protocol traffic.
+  filter:
+  - for: SNMP
+    name: SNMP
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '161'
+  - for: SNMP
+    name: SNMPTRAP
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '162'
+  payload:
+    for: SNMP
+    description:
+      _text: Tags Simple Network Management Protocol over UDP port 161 and 162 for
+        SNMPTRAP services. The payload looks for SNMP HEX pattern match that will
+        extract the CommunityID and the RequestID from the DATA GET request header.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: InternetStandardProtocol
+            _text: SNMP
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 302E02
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: CommunityID
+            from: '7'
+            to: '15'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: RequestID
+            from: '19'
+            to: '23'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: INTEGER

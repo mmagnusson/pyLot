@@ -1,0 +1,46 @@
+fingerprint:
+  header:
+    name:
+      _text: CodeSys
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of CodeSys traffic.
+  filter:
+  - for: Gateway Server 1
+    name: Dst 2455
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '2455'
+  - for: Gateway Server 2
+    name: Dst 1200
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1200'
+  payload:
+  - for: Gateway Server 1
+    description:
+      _text: Gateway Server for industrial devices running CodeSys programming interface
+    always:
+      return:
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: ICSProtocol
+            _text: CodeSys
+  - for: Gateway Server 2
+    description:
+      _text: Gateway Server for industrial devices running CodeSys programming interface
+    always:
+      return:
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: ICSProtocol
+            _text: CodeSys

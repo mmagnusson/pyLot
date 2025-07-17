@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: ServerStart
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of ServerStart RemoteControl traffic.
+  filter:
+    for: ServerStart
+    name: RemoteControl
+    srcport:
+      _text: '9213'
+  payload:
+    for: ServerStart
+    description:
+      _text: Tags inbound ServerStart RemoteControl traffic by source port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ServerStart RemoteControl

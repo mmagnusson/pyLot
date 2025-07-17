@@ -1,0 +1,74 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell CSP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Rockwell CSP1, CSP2, and CSP3
+        traffic.
+  filter:
+  - for: CSP1
+    name: CSP1 Src
+    srcport:
+      _text: '2221'
+  - for: CSP1
+    name: CSP1 Dst
+    dstport:
+      _text: '2221'
+  - for: CSP2
+    name: CSP2 Src
+    srcport:
+      _text: '2222'
+  - for: CSP2
+    name: CSP2 Dst
+    dstport:
+      _text: '2222'
+  - for: CSP3
+    name: CSP3 Src
+    srcport:
+      _text: '2223'
+  - for: CSP3
+    name: CSP3 Dst
+    dstport:
+      _text: '2223'
+  payload:
+  - for: CSP1
+    description:
+      _text: Rockwell CSP1 that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell CSP1
+  - for: CSP2
+    description:
+      _text: Rockwell CSP2 that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell CSP2
+  - for: CSP3
+    description:
+      _text: Rockwell CSP3 that tags the source and destination ports
+    always:
+      return:
+        direction: SOURCE
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell CSP3

@@ -1,0 +1,44 @@
+fingerprint:
+  header:
+    name:
+      _text: CT Discovery Protocol
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of CT Discovery Protocol traffic.
+  filter:
+  - for: CTDP Src
+    name: SrcPort
+    srcport:
+      _text: '7022'
+  - for: CTDP Dst
+    name: DstPort
+    dstport:
+      _text: '7022'
+  payload:
+  - for: CTDP Src
+    description:
+      _text: Tags source traffic of CT Discovery Protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: DiscoveryProtocol
+            _text: CT Discovery Protocol
+  - for: CTDP Dst
+    description:
+      _text: Tags destination traffic of CT Discovery Protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: DiscoveryProtocol
+            _text: CT Discovery Protocol

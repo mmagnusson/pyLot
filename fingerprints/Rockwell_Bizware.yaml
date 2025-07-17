@@ -1,0 +1,188 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell Bizware
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Bizware Task Manager traffic.
+        This fingerprint looks for evidence of Bizware Production Server traffic.
+        This fingerprint looks for evidence of Bizware Server Manager traffic. This
+        fingerprint looks for evidence of Bizware CTP Server traffic. This fingerprint
+        looks for evidence of Bizware PlantMetrics Server traffic.
+  filter:
+  - for: ' Task Manager'
+    name: Task Manager
+    dstport:
+      _text: '4123'
+    transportprotocol:
+      _text: '6'
+  - for: ' Production Server'
+    name: Production
+    dstport:
+      _text: '4120'
+    transportprotocol:
+      _text: '6'
+  - for: ' Server Manager'
+    name: Server
+    dstport:
+      _text: '4121'
+    transportprotocol:
+      _text: '6'
+  - for: ' CTP Server'
+    name: CTP
+    dstport:
+      _text: '4125'
+    transportprotocol:
+      _text: '6'
+  - for: ' PlantMetrics Server'
+    name: PlantMetrics
+    dstport:
+      _text: '4122'
+    transportprotocol:
+      _text: '6'
+  - for: ' Scheduler'
+    name: Scheduler
+    dstport:
+      _text: '4124'
+    transportprotocol:
+      _text: '6'
+  - for: ' HTTP Product Server'
+    name: HTTP Product
+    dstport:
+      _text: '8080'
+    transportprotocol:
+      _text: '6'
+  - for: ' HTTP Server Manager'
+    name: HTTP Server
+    dstport:
+      _text: '8081'
+    transportprotocol:
+      _text: '6'
+  - for: ' HTTP CTP Server'
+    name: HTTP CTP
+    dstport:
+      _text: '8083'
+    transportprotocol:
+      _text: '6'
+  payload:
+  - for: ' Task Manager'
+    description:
+      _text: Rockwell Bizware Task Manager payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware Task Manager
+  - for: ' Production Server'
+    description:
+      _text: Rockwell Bizware Production Server payload that tags the destination
+        port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware Production Server
+  - for: ' Server Manager'
+    description:
+      _text: Rockwell Bizware Server Manager payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware Server Manager
+  - for: ' CTP Server'
+    description:
+      _text: Rockwell Bizware CTP Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware CTP Server
+  - for: ' PlantMetrics Server'
+    description:
+      _text: Rockwell Bizware Server Manager payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware PlanMetrics Server
+  - for: ' Scheduler'
+    description:
+      _text: Rockwell Bizware Scheduler payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware Task Manager
+  - for: ' HTTP Product Server'
+    description:
+      _text: Rockwell Bizware HTTP Product Server payload that tags the destination
+        port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware HTTP Product Server
+  - for: ' HTTP Server Manager'
+    description:
+      _text: Rockwell Bizware HTTP Server Manager payload that tags the destination
+        port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware HTTP Server Manager
+  - for: ' HTTP CTP Server'
+    description:
+      _text: Rockwell Bizware HTTP CTP Server payload that tags the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell Bizware HTTP CTP Server

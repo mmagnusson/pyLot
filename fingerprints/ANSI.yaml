@@ -1,0 +1,43 @@
+fingerprint:
+  header:
+    name:
+      _text: ANSI
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidenece of ANSI x3.28, z39.50, and c1222-asse
+        traffic.
+  filter:
+  - for: ANSI 1
+    name: z39.50
+    dstport:
+      _text: '210'
+  - for: ANSI 2
+    name: c1222-asse
+    dstport:
+      _text: '1153'
+  payload:
+  - for: ANSI 1
+    description:
+      _text: Developed by Allen Bradley to communicate between stations and substations.
+        Z39.50
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ISCProtocol
+            _text: ANSI
+  - for: ANSI 2
+    description:
+      _text: Developed by Allen Bradley to communicate between stations and substations.
+        C1222-ASSE.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ICSProtocol
+            _text: ANSI

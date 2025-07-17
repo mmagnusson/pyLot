@@ -1,0 +1,116 @@
+fingerprint:
+  header:
+    name:
+      _text: EtherNetIP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of EtherNetIP traffic.
+    tag:
+      _text: ETHERNETIP
+  filter:
+  - for: EtherNetIP UDP List Identity Response
+    name: UDP List
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '44818'
+  - for: Replier/Requester UDP
+    name: Dst
+    dstport:
+      _text: '44818'
+  - for: Replier/Requester UDP
+    name: Src
+    srcport:
+      _text: '44818'
+  payload:
+  - for: Replier/Requester UDP
+    description:
+      _text: Tags UDP replier/requester EtherNetIP traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ETHERNETIP
+  - for: EtherNetIP UDP List Identity Response
+    description:
+      _text: Tags UDP identity EtherNetIP response traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ETHERNETIP
+    match:
+      offset: '24'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 01000C00
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: ENIP Vendor
+            from: '48'
+            to: '50'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              lookup: ENIPVENDOR
+          - name: ENIP Device Type
+            from: '50'
+            to: '52'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              lookup: ENIPDEVICE
+          - name: ENIP Product Code
+            from: '52'
+            to: '54'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              convert: INTEGER
+          - name: ENIP Serial Number
+            from: '58'
+            to: '62'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              convert: HEX
+        bytejump:
+          postoffset: '63'
+          relative: 'false'
+          endian: BIG
+          offset: '62'
+          bytes: '1'
+          andthen:
+            return:
+              direction: SOURCE
+              confidence: '5'
+              details: {}
+              extract:
+                name: Model
+                from: '63'
+                to: CURSOR_MAIN
+                maxlength: '1024'
+                endian: BIG
+                post:
+                  convert: STRING

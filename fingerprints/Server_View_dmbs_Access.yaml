@@ -1,0 +1,23 @@
+fingerprint:
+  header:
+    name:
+      _text: Server View dmbs Access
+    author:
+      _text: Default
+    description:
+      _text: This tries to find Server view dmbs access traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    srcport:
+      _text: '9212'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '1'
+        extract:
+          name: SERVERVIEWDBMS
+          from: CURSOR_START
+          to: CURSOR_END
