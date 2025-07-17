@@ -1,0 +1,464 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell FactoryTalk
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of FactoryTalk Event Server traffic.
+        This fingerprint looks for evidence of FactoryTalk Directory Server File transfer
+        traffic. This fingerprint looks for evidence of FactoryTalk Directory Server
+        traffic. This fingerprint looks for evidence of FactoryTalk Alarming  traffic.
+        This fingerprint looks for evidence of FactoryTalk Object RPC traffic.This
+        fingerprint looks for evidence of FactoryTalk Event Multiplexor traffic.This
+        fingerprint looks for evidence of FactoryTalk Service control traffic.This
+        fingerprint looks for evidence of FactoryTalk Server Health traffic. This
+        fingerprint looks for evidence of FactoryTalk Historian Site Edition which
+        includes PI Network Manager, Analysis Framework v1.x, ACE2 scheduler, Asset
+        Framework Server, PI Notifications, Asset Framework to OLEDB Enterprise. This
+        fingerprint looks for evidence of FactoryTalk Asset Centre Services traffic.
+        This fingerprint looks for evidence of FactoryTalk Asset Centre Server/ VantagePoint
+        SQL or MSSQL. This fingerprint looks for evidence of FactoryTalk Live Data/SE
+        HMI Tag Server. This fingerprint looks for evidence of FactoryTalk Diagnostics.
+        This fingerprint looks for evidence of FactoryTalk Diagnostics VantagePoint
+        Incuity Server Advertiser.
+  filter:
+  - for: Alarming Server
+    name: Alarming
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6543'
+  - for: Object RPC
+    name: RPC
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1330'
+  - for: Event Multiplexor
+    name: Multiplexor
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '7600'
+  - for: Service Control
+    name: Control
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1331'
+  - for: Server Health
+    name: Server Health
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1332'
+  - for: Event Server
+    name: Event Server
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '7700'
+  - for: Directory Server File Transfer
+    name: File Transfer
+    dstport:
+      _text: '3060'
+  - for: Directory Server
+    name: Directory Server
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '7710'
+  - for: PI Network Manager
+    name: PI Network
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5450'
+  - for: Analysis Framework 5454
+    name: '5454'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5454'
+  - for: Analysis Framework 5455
+    name: '5455'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5455'
+  - for: ACE2 Scheduler
+    name: ACE2
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5456'
+  - for: Asset Framework Server
+    name: Asset Framework
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5457'
+  - for: PI Notification
+    name: PI
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5458'
+  - for: Asset Centre Services 7002
+    name: '7002'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '7002'
+  - for: Asset Centre Services 7003
+    name: '7003'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '7003'
+  - for: Asset Centre Services 7004
+    name: '7004'
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '7004'
+  - for: Asset Centre Server/VantagePoint SQL
+    name: SQL
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1433'
+  - for: Asset Centre Server/VantagePoint MSSQL
+    name: MSSQL
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1434'
+  - for: Live Data/SE HMI Tag Server
+    name: Data/SE HMI
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '49281'
+  - for: Diagnostics
+    name: Diagnostics
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '60093'
+  - for: VantagePoint Incuity Server Advertiser
+    name: Incuity Server
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '65207'
+  payload:
+  - for: Alarming Server
+    description:
+      _text: Rockwell FactoryTalk Alarming Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Alarming Server
+  - for: Object RPC
+    description:
+      _text: Rockwell FactoryTalk Object RPC
+    always:
+      return:
+        direction: SOURCE
+        confidence: '2'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Object RPC
+  - for: Event Multiplexor
+    description:
+      _text: Rockwell FactoryTalk Object RPC
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Event Multiplexor
+  - for: Service Control
+    description:
+      _text: Rockwell FactoryTalk Service Control
+    always:
+      return:
+        direction: SOURCE
+        confidence: '2'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Service Control
+  - for: Server Health
+    description:
+      _text: Rockwell FactoryTalk Server Health
+    always:
+      return:
+        direction: SOURCE
+        confidence: '2'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Server Health
+  - for: Event Server
+    description:
+      _text: Rockwell FactoryTalk Event Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '2'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Event Server
+  - for: Directory Server File Transfer
+    description:
+      _text: Rockwell FactoryTalk Directory Server File Transfer
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Directory Server File Transfer
+  - for: Directory Server
+    description:
+      _text: Rockwell FactoryTalk Directory Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Directory Server
+  - for: PI Network Manager
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - PI Network Manager
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: ENGINEER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk PI Network Manager
+  - for: Analysis Framework 5454
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - Analysis Framework 5454
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Analysis Framework 5454
+  - for: Analysis Framework 5455
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - Analysis Framework 5455
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Analysis Framework 5455
+  - for: ACE2 Scheduler
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - ACE2 Scheduler
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk ACE2 Scheduler
+  - for: Asset Framework Server
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - Asset Framework Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Framework Server
+  - for: PI Notification
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - PI Notification
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk PI Notification
+  - for: Asset Centre Services 7002
+    description:
+      _text: Rockwell FactoryTalk Historian Site Edition - Asset Centre Services 7002
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Centre Services 7002
+  - for: Asset Centre Services 7003
+    description:
+      _text: Rockwell FactoryTalk Asset Centre Services 7003
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Centre Services 7003
+  - for: Asset Centre Services 7004
+    description:
+      _text: Rockwell FactoryTalk Asset Centre Services 7004
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Centre Services 7004
+  - for: Asset Centre Server/VantagePoint SQL
+    description:
+      _text: Rockwell FactoryTalk Asset Centre Server/ VantagePoint SQL
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Centre Server. SQL server communication
+              over default port.
+  - for: Asset Centre Server/VantagePoint MSSQL
+    description:
+      _text: Rockwell FactoryTalk Asset Centre Server/ VantagePoint MSSQL
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Asset Centre Server. Recommended static destination
+              port for MSSQL to minimize the number of ports open to a firewall.
+  - for: Live Data/SE HMI Tag Server
+    description:
+      _text: Rockwell FactoryTalk Live Data/SE HMI Tag Server
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Live Data/SE HMI Tag Server.
+  - for: Diagnostics
+    description:
+      _text: Rockwell FactoryTalk Diagnostics
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk Diagnostics.
+  - for: VantagePoint Incuity Server Advertiser
+    description:
+      _text: Rockwell FactoryTalk VantagePoint Incuity Server Advertiser
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell FactoryTalk VantagePoint Incuity Server Advertiser.

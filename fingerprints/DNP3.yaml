@@ -1,0 +1,72 @@
+fingerprint:
+  header:
+    name:
+      _text: DNP3
+    author:
+      _text: Default
+    description:
+      _text: Looks for evidence of DNP3 traffic on src/des on port 20000
+  filter:
+  - for: DNP3_Master
+    name: Master
+    dstport:
+      _text: '20000'
+  - for: DNP3_Slave
+    name: Slave
+    srcport:
+      _text: '20000'
+  payload:
+  - for: DNP3_Master
+    description:
+      _text: Finds a DNP3 Master device by matching the DNP3 header and attaches details
+        to the DESTINATION in the frame.
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'false'
+      content:
+        type: HEX
+        _text: '0564'
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '4'
+          details:
+            category:
+              _text: MTU
+            role:
+              _text: MASTER
+            detail:
+              name: ICSProtocol
+              _text: DNP3
+  - for: DNP3_Slave
+    description:
+      _text: Finds a DNP3 Slave device by matching the DNP3 header and attaches details
+        to the SOURCE in the frame.
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'false'
+      content:
+        type: HEX
+        _text: '0564'
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '4'
+          details:
+            category:
+              _text: IED
+            role:
+              _text: SLAVE
+            detail:
+              name: ICSProtocol
+              _text: DNP3

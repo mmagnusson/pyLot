@@ -1,0 +1,25 @@
+fingerprint:
+  header:
+    name:
+      _text: Korenix
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Korenix 6550 traffic.
+  filter:
+    for: Korenix
+    name: '6550'
+    dstport:
+      _text: '502'
+  payload:
+    for: Korenix
+    description:
+      _text: Korenix 6550 PLC series for communication monitoring.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Product
+            _text: Korenix 6550

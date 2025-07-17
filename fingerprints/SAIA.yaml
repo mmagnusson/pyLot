@@ -1,0 +1,25 @@
+fingerprint:
+  header:
+    name:
+      _text: SAIA S-BUS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of SAIA S-BUS traffic.
+  filter:
+    for: SAIA
+    name: S-BUS
+    dstport:
+      _text: '5050'
+  payload:
+    for: SAIA
+    description:
+      _text: Communication Protocol between PDC and PLC by Saia-Burgess Controls.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Product
+            _text: SAIA

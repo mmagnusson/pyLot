@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: Red Lion
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Red Lion traffic running the CrimsonV3
+        software for HMI.
+  filter:
+    for: Red Lion CrimsonV3
+    name: CrimsonV3
+    dstport:
+      _text: '789'
+  payload:
+    for: Red Lion CrimsonV3
+    description:
+      _text: Red Lion traffic running the CrimsonV3 software for HMI.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: Red Lion CrimsonV3

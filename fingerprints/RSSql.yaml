@@ -1,0 +1,34 @@
+fingerprint:
+  header:
+    name:
+      _text: RSSql
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of RSSql transaction Manager
+        traffic.This fingerprint looks for the evidence of RSSql Compression Server
+        traffic.This fingerprint looks for the evidence of RSSql Configuration Server
+        traffic.
+  filter:
+  - for: ' Transaction Manager'
+    dstport:
+      _text: '400'
+  - for: ' Compression Server'
+    dstport:
+      _text: '401'
+  - for: ' Configuration Server'
+    dstport:
+      _text: '402'
+  payload:
+  - for: ' Transaction Manager'
+    always:
+      return:
+        confidence: '2'
+  - for: ' Compression Server'
+    always:
+      return:
+        confidence: '2'
+  - for: ' Configuration Server'
+    always:
+      return:
+        confidence: '2'

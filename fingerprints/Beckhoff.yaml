@@ -1,0 +1,111 @@
+fingerprint:
+  header:
+    name:
+      _text: Beckhoff
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of EtherCAT traffic.
+  filter:
+  - for: EtherCAT TCP Master
+    name: TCP Master
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '34980'
+  - for: EtherCAT TCP Slave
+    name: TCP Slave
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '34980'
+  - for: EtherCAT UDP Master
+    name: UDP Master
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '34980'
+  - for: EtherCAT UDP Slave
+    name: UDP Slave
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '34980'
+  - for: Embedded PC
+    name: PC
+    dstport:
+      _text: '48898'
+  payload:
+  - for: EtherCAT TCP Master
+    description:
+      _text: EtherCAT Master that matches TCP and port number
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: MTU
+          role:
+            _text: MASTER
+          detail:
+            name: ICSProtocol
+            _text: BECKHOFF EtherCAT
+  - for: EtherCAT TCP Slave
+    description:
+      _text: EtherCAT Slave that matches TCP and port number
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          role:
+            _text: SLAVE
+          detail:
+            name: ICSProtocol
+            _text: BECKHOFF EtherCAT
+  - for: EtherCAT UDP Master
+    description:
+      _text: EtherCAT Master that matches UDP and port number
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: MTU
+          role:
+            _text: MASTER
+          detail:
+            name: ICSProtocol
+            _text: BECKHOFF EtherCAT
+  - for: EtherCAT UDP Slave
+    description:
+      _text: EtherCAT Slave that matches UDP and port number
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          role:
+            _text: SLAVE
+          detail:
+            name: ICSProtocol
+            _text: BECKHOFF EtherCAT
+  - for: Embedded PC
+    description:
+      _text: BECKHOFF Embedded PC over destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          detail:
+            name: ICSProtocol
+            _text: BECKHOFF Embedded PC

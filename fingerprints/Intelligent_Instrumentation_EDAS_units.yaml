@@ -1,0 +1,29 @@
+fingerprint:
+  header:
+    name:
+      _text: Intelligent Instrumentation EDAS units
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Undocumented usage by Intelligent
+        Instrumentation EDAS units, models EDAS-1001E, -1002E, -1024E, 1031E traffic.
+  filter:
+    for: Intelligent Instrumentation
+    name: Undocumented EDAS unites
+    srcport:
+      _text: '5891'
+  payload:
+    for: Intelligent Instrumentation
+    description:
+      _text: Tags Undocumented usage by Intelligent Instrumentation EDAS unites by
+        incoming source port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Intelligent Instrumentation EDAS

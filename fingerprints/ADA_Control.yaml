@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: ADA Control
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of ADA Control traffic.
+  filter:
+    for: ADA-CIP
+    name: DstPort
+    dstport:
+      _text: '2085'
+  payload:
+    for: ADA-CIP
+    description:
+      _text: TCP/UDP ADA-CIP
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ADA-CIP

@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: IEC 60870-5-104
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of IEC 60870-5-104 traffic.
+  filter:
+    for: 60870-5-104
+    name: 60870-5-104
+    dstport:
+      _text: '2404'
+  payload:
+    for: 60870-5-104
+    description:
+      _text: Set of standards which define systems used for SCADA in electrical engineering
+        and power systems
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: IEC 60870-5-104

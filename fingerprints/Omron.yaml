@@ -1,0 +1,29 @@
+fingerprint:
+  header:
+    name:
+      _text: Omron
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Omron Factory Interface Network
+        (FIN) Service traffic. Protocol is used by Omron PLCs over physical networks.
+  filter:
+    for: Factory Interface Network Service
+    name: Network Service
+    dstport:
+      _text: '9600'
+  payload:
+    for: Factory Interface Network Service
+    description:
+      _text: This network protocol is used by Omron PLCs and it looks for the response
+        code over the port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          detail:
+            name: ICSProtocol
+            _text: FIN (Factory Interface Network) Service

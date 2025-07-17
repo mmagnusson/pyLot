@@ -1,0 +1,56 @@
+fingerprint:
+  header:
+    name:
+      _text: Who_Login
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of who/login against tcp/udp traffic.
+        This is a automatic authentication performed based on privileged port numbers
+        and distributed databases which identify "authentication domains." Also the
+        protocol maintains databases showing who's logged into the machines on a local
+        network and the load average of the machine.
+  filter:
+  - for: who_login
+    name: SrcPort
+    srcport:
+      _text: '513'
+  - for: who_login
+    name: DstPort
+    dstport:
+      _text: '513'
+  payload:
+    for: who_login
+    description:
+      _text: Tags version 1 type 1, WHO or LOGIN protocol over 513 tcp/udp traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Authentication
+            _text: WHO/Login
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '12'
+      relative: 'true'
+      within: '0'
+      movecursors: 'true'
+      pattern:
+        _text: '1010'
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+            name: Hostname
+            from: '12'
+            to: '16'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING

@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: ProconOS
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of ProconOS traffic.
+  filter:
+    for: ProconOS
+    name: DstPort
+    dstport:
+      _text: '20547'
+  payload:
+    for: ProconOS
+    description:
+      _text: High performance PLC runtime engine desinged to run both embedded and
+        PC applications
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          detail:
+            name: ICSProtocol
+            _text: ProconOS

@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Siemens AuD SCP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Siemens AuD SCP traffic.
+  filter:
+    for: AuD SCP
+    name: SCP
+    dstport:
+      _text: '3820'
+  payload:
+    for: AuD SCP
+    description:
+      _text: Tags Siemens AuD SCP traffic over known destination port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '3'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Siemens
+            _text: AuD SCP

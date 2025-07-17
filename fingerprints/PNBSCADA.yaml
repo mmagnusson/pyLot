@@ -1,0 +1,26 @@
+fingerprint:
+  header:
+    name:
+      _text: PNBSCADA
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of PNBSCADA traffic.
+  filter:
+    for: PNBSCADA
+    name: DstPort
+    dstport:
+      _text: '3875'
+  payload:
+    for: PNBSCADA
+    description:
+      _text: Tags PNBSCADA by TCP/UDP destination port
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: PNBSCADA

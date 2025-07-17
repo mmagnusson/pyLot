@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: FODMS FLIP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of FODMS FLIP traffic.
+  filter:
+    for: FODMS FLIP
+    name: SrcPort
+    srcport:
+      _text: '7200'
+  payload:
+    for: FODMS FLIP
+    description:
+      _text: Fiber optics multiplexing service as per RFC 822
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: FODMS FLIP

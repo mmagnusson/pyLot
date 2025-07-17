@@ -1,0 +1,22 @@
+fingerprint:
+  header:
+    name:
+      _text: Simple Network Management Protocol
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of the Simple Network Management
+        Protocol traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '161'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '1'

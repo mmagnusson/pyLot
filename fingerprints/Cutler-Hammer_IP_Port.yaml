@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Cutler-Hammer IP Port
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Cutler-Hammer IP Port traffic.
+  filter:
+    for: IPCS Command
+    name: DstPort
+    dstport:
+      _text: '3743'
+  payload:
+    for: IPCS Command
+    description:
+      _text: Tags the Cutler-Hammer IP Port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSCommand
+            _text: IPCS Command

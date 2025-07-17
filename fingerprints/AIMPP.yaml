@@ -1,0 +1,45 @@
+fingerprint:
+  header:
+    name:
+      _text: AIMPP
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of TCP/UDP AIMPP Hello traffic. This
+        fingerprint looks for evidence of TCP/UDP AIMPP Port Req traffic.
+  filter:
+  - for: Hello
+    name: Hello 2846
+    dstport:
+      _text: '2846'
+  - for: Port Req
+    name: Port Req 2847
+    dstport:
+      _text: '2847'
+  payload:
+  - for: Hello
+    description:
+      _text: Hello AIMPP that hits on destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: AIMPP Hello
+  - for: Port Req
+    description:
+      _text: Port Req AIMPP that hits on destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: AIMPP Port Req

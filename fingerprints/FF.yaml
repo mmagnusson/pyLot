@@ -1,0 +1,55 @@
+fingerprint:
+  header:
+    name:
+      _text: FF
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of FF LAN Redundancy Port traffic.This
+        fingerprint looks for the evidence of FF Fieldbus traffic.This fingerprint
+        looks for the evidence of FF System Management traffic.This fingerprint looks
+        for the evidence of FF Annunciation traffic.
+  filter:
+  - for: ' LAN Redundancy Port'
+    dstport:
+      _text: '3622'
+  - for: ' Fieldbus Message Specification'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '1090'
+    dstport:
+      _text: '1090'
+  - for: ' SYstem Management'
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '1091'
+    dstport:
+      _text: '1091'
+  - for: ' Annunciation'
+    srcport:
+      _text: '1089'
+    dstport:
+      _text: '1089'
+  payload:
+  - for: ' LAN Redundancy Port'
+    always:
+      return:
+        confidence: '5'
+        extract:
+          name: FF-LR-PORT
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Fieldbus Message Specification'
+    always:
+      return:
+        confidence: '4'
+  - for: ' SYstem Management'
+    always:
+      return:
+        confidence: '4'
+  - for: ' Annunciation'
+    always:
+      return:
+        confidence: '4'

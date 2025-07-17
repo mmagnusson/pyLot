@@ -1,0 +1,147 @@
+fingerprint:
+  header:
+    name:
+      _text: Domain Controller
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of domain controller communication
+        including client computers, authentication, and active directory.
+  filter:
+  - for: Domain Controller
+    name: Controller Traffic
+    dstport:
+      _text: '135'
+  - for: Kerberos
+    name: Authentication
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '88'
+  - for: File Replication Service
+    name: UDP File Replication
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: File Replication Service
+    name: TCP File Replication
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '139'
+  - for: Light Directory Application Protocol
+    name: LDAP Query
+    dstport:
+      _text: '389'
+  - for: Light Directory Application Protocol
+    name: LDAP SSL
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '636'
+  - for: Light Directory Application Protocol
+    name: LDAP Global Catalog
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '3268'
+  - for: Light Directory Application Protocol
+    name: LDAP Global Catalog SSL
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '3269'
+  - for: FRS-RPC
+    name: Microsoft FRS-RPC service
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '53248'
+  - for: DFS-R
+    name: Microsoft DFS Replication Service
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5722'
+  payload:
+  - for: Domain Controller
+    description:
+      _text: Identifies domain contoller to domain controller traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: Authentication
+  - for: Kerberos
+    description:
+      _text: Identifies kerberos authentication traffic.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: Kerberos
+  - for: File Replication Service
+    description:
+      _text: File replication service between domain controllers.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: File Replication Service
+  - for: Light Directory Application Protocol
+    description:
+      _text: LDAP to handle normal queries from client computers to domain controllers.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: LDAP
+  - for: FRS-RPC
+    description:
+      _text: Microsoft technology that replicates files and folders stored in the
+        SYSVOL shared folder on domain controllers and distributed shared folders.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: FRS-RPC
+  - for: DFS-R
+    description:
+      _text: Microsoft DFS replication service that shares folders that can be kept
+        synchronized by using methods other than FRS.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Service
+            _text: DFS-R

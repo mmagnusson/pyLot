@@ -1,0 +1,63 @@
+fingerprint:
+  header:
+    name:
+      _text: PROFInet
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of PROFInet RT Multicast traffic.
+        This fingerprint looks for the evidence of PROFInet RT Unicast traffic. This
+        fingerprint looks for the evidence of PROFInet Context Manager traffic.
+  filter:
+  - for: RT Multicast
+    name: Multicast
+    srcport:
+      _text: '34963'
+  - for: RT Unicast
+    name: Unicast
+    dstport:
+      _text: '34962'
+  - for: Context Manager
+    name: Manager
+    srcport:
+      _text: '34964'
+  payload:
+  - for: RT Multicast
+    description:
+      _text: PROFInet RT Multicast over source port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: RT Multicast
+  - for: RT Unicast
+    description:
+      _text: PROFInet RT Unicast over destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: RT Unicast
+  - for: Context Manager
+    description:
+      _text: PROFInet Context Manager over source port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Context Manager

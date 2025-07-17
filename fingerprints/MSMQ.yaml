@@ -1,0 +1,112 @@
+fingerprint:
+  header:
+    name:
+      _text: MSMQ
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of the Microsoft messaging queuing
+        system for the messaging infrastructure and development tool for creating
+        distributed messaging applications for Windows.
+  filter:
+  - for: MSMQ
+    name: MSMQ
+    dstport:
+      _text: '1801'
+  - for: MSMQ-DCs
+    name: DCs TCP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '2101'
+  - for: MSMQ-Mgmt
+    name: Mgmt TCP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '27107'
+  - for: MSMQ-Ping
+    name: Ping UDP
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '3527'
+  - for: MSMQ-RPC
+    name: RPC TCP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '2105'
+  - for: MSMQ-RPC2
+    name: RPC2 TCP
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '2103'
+  payload:
+  - for: MSMQ
+    description:
+      _text: MSMQ UDP/TCP over 1801
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ
+  - for: MSMQ-DCs
+    description:
+      _text: MSMQ-DCs TCP over 2101
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ-DCs
+  - for: MSMQ-Mgmt
+    description:
+      _text: MSMQ-Mgmt TCP over 2107
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ-Mgmt
+  - for: MSMQ-Ping
+    description:
+      _text: MSMQ-Ping UDP over 3527
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ-Ping
+  - for: MSMQ-RPC
+    description:
+      _text: MSMQ-RPC TCP over 2105
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ-RPC
+  - for: MSMQ-RPC2
+    description:
+      _text: MSMQ-RPC2 TCP over 2103
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Microsoft Server Product
+            _text: MSMQ-RPC2

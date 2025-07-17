@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Koyo Ethernet
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Koyo Ethernet traffic over 28784.
+  filter:
+    for: Koyo Ethernet
+    name: Ethernet DstPort
+    dstport:
+      _text: '28784'
+  payload:
+    for: Koyo Ethernet
+    description:
+      _text: PLC that uses IEC/JIS standards under the Direct Logic PLC.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          detail:
+            name: ICSProtocol
+            _text: Koyo Ethernet

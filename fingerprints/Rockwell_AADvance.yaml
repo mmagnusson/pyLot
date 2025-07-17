@@ -1,0 +1,188 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell AADvance
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Rockwell AADvance traffic.
+  filter:
+  - for: ModbusTCP
+    name: ModbusTCP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '502'
+  - for: SNCP
+    name: SNCP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1132'
+  - for: ModbusRTU
+    name: ModbusRTU
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '1132'
+  - for: Discover Tool
+    name: Discover Tool 2010
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '2010'
+  - for: Discover Tool
+    name: Discover Tool 2011
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '2011'
+  - for: Peer to Peer
+    name: P2P
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '5000'
+  - for: Serial Data
+    name: Serial 10001
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10001'
+  - for: Serial Data
+    name: Serial 10002
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10002'
+  - for: Serial Data
+    name: Serial 10003
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10003'
+  - for: Serial Data
+    name: Serial 10004
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10004'
+  - for: Serial Data
+    name: Serial 10005
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10005'
+  - for: Serial Data
+    name: Serial 10006
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '10006'
+  - for: Telnet
+    name: Telnet
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '55555'
+  payload:
+  - for: ModbusTCP
+    description:
+      _text: Rockwell AADvance ModbusTCP that tags the destination port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Protocol
+            _text: Rockwell AADvance ModbusTCP
+  - for: SNCP
+    description:
+      _text: Rockwell AADvance tagged via destination port. Safely network control
+        protocol, used by opc, workbench debugger and binding networks.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell AADvance SNCP
+  - for: ModbusRTU
+    description:
+      _text: Rockwell AADvance tagged via destination port. RTU packaged in serial
+        stream. Other ports may be assigned.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: RTU
+          role:
+            _text: SLAVE
+          detail:
+            name: Product
+            _text: Rockwell AADvance ModbusRTU
+  - for: Discover Tool
+    description:
+      _text: Rockwell AADvance tagged via destination port. Used to configure systems.
+        the tool sends broadcast to 2010 and systems reply to port 2011.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: RTU
+          role:
+            _text: SLAVE
+          detail:
+            name: Product
+            _text: Rockw ell AADvance Discovery Tool
+  - for: Peer to Peer
+    description:
+      _text: Rockwell AADvance tagged via destination port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell AADvance Peer to Peer
+  - for: Serial Data
+    description:
+      _text: Rockwell AADvance tagged via destination port. Transparent communication
+        interface, where an Ethernet host can talk through AADvance to a serial port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell AADvance Serial Data
+  - for: Telnet
+    description:
+      _text: Rockwell AADvance tagged via destination port. Diagnostic command line
+        interface
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: Rockwell AADvance Telnet

@@ -1,0 +1,24 @@
+fingerprint:
+  header:
+    name:
+      _text: Undocumented usage by Intelligent Instrumentation EDAS unites
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Undocumented usage by Intelligent
+        Instrumentation EDAS units, models EDAS-1001E, -1002E, -1024E, 1031E traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    srcport:
+      _text: '5891'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '5'
+        extract:
+          name: EDAS
+          from: CURSOR_START
+          to: CURSOR_END

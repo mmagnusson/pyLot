@@ -1,0 +1,76 @@
+fingerprint:
+  header:
+    name:
+      _text: OMF
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of OMF Data B traffic. This fingerprint
+        looks for evidence of OMF Data M traffic. This fingerprint looks for evidence
+        of OMF Data H traffic. This fingerprint looks for evidence of OMF Data L traffic
+  filter:
+  - for: Data B
+    name: ANET-B
+    dstport:
+      _text: '3338'
+  - for: Data M
+    name: ANET-M
+    dstport:
+      _text: '3340'
+  - for: Data H
+    name: ANET-H
+    dstport:
+      _text: '3341'
+  - for: Data L
+    name: ANET-L
+    dstport:
+      _text: '0'
+  payload:
+  - for: Data B
+    description:
+      _text: OMF Data B ANET-B
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ANET-B
+  - for: Data M
+    description:
+      _text: OMF Data M ANET-M
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ANET-M
+  - for: Data H
+    description:
+      _text: OMF Data H ANET-H
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ANET-H
+  - for: Data L
+    description:
+      _text: OMF Data L ANET-L
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: ANET-L

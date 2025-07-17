@@ -1,0 +1,23 @@
+fingerprint:
+  header:
+    name:
+      _text: FlexLM Server
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of FlexLM server traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    dstport:
+      _text: '27000'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: FLEXLM-SERVER
+          from: CURSOR_START
+          to: CURSOR_END

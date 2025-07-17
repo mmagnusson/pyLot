@@ -1,0 +1,23 @@
+fingerprint:
+  header:
+    name:
+      _text: Fagordnc
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of FAGORDNC traffic.
+    tag:
+      _text: Original
+  filter:
+    for: default
+    dstport:
+      _text: '3873'
+  payload:
+    for: default
+    always:
+      return:
+        confidence: '5'
+        extract:
+          name: FAGORDNC
+          from: CURSOR_START
+          to: CURSOR_END

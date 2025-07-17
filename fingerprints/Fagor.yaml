@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: Fagor
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence for Fagor DNC traffic.
+  filter:
+    for: Fagor
+    name: DNC
+    dstport:
+      _text: '3873'
+  payload:
+    for: Fagor
+    description:
+      _text: Fagor DNC over 3873
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: DNC

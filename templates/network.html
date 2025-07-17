@@ -1,0 +1,313 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Network Topology - GrassMarlin Lite</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.21.1/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin: 0 0 10px 0;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: #e7f3ff;
+            padding: 10px 15px;
+            border-radius: 4px;
+            border-left: 4px solid #0074D9;
+        }
+        .stat-box strong {
+            color: #0074D9;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        #cy {
+            width: 100%;
+            height: 600px;
+            background-color: #fafafa;
+        }
+        .controls {
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+        .btn {
+            background-color: #0074D9;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #0074D9;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Upload</a>
+    
+    <div class="header">
+        <h1>Network Topology Analysis</h1>
+        <div class="stats">
+            <div class="stat-box">
+                <strong>{{ devices|length }}</strong> devices detected
+            </div>
+            <div class="stat-box">
+                <strong>{{ connections|length }}</strong> connections found
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="cy"></div>
+        <div class="controls">
+            <button class="btn" onclick="resetLayout()">Reset Layout</button>
+            <button class="btn" onclick="fitView()">Fit to View</button>
+            <button class="btn" onclick="exportData()">Export Data</button>
+            <input type="text" id="filterInput" placeholder="Filter by protocol/category/role..." style="margin-left:20px; padding:6px; border-radius:4px; border:1px solid #ccc; width:220px;">
+            <button class="btn" onclick="applyFilter()">Apply Filter</button>
+            <button class="btn" onclick="clearFilter()">Clear Filter</button>
+        </div>
+    </div>
+
+    <script>
+        let cy;
+        let allElements = [];
+        
+        fetch('/api/graph')
+            .then(res => res.json())
+            .then(data => {
+                const nodes = {};
+                const edges = [];
+
+                data.forEach(conn => {
+                    nodes[conn.data.source] = true;
+                    nodes[conn.data.target] = true;
+                    edges.push({ data: conn.data });
+                });
+
+                const elements = Object.keys(nodes).map(id => ({ 
+                    data: { 
+                        id,
+                        label: id.length > 15 ? id.substring(0, 12) + '...' : id
+                    } 
+                })).concat(edges);
+                allElements = elements;
+
+                cy = cytoscape({
+                    container: document.getElementById('cy'),
+                    elements: elements,
+                    style: [
+                        { 
+                            selector: 'node', 
+                            style: { 
+                                'label': 'data(label)', 
+                                'background-color': '#0074D9',
+                                'color': 'white',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'width': '120px',
+                                'height': '60px',
+                                'font-size': '10px',
+                                'font-weight': 'bold',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '100px'
+                            } 
+                        },
+                        { 
+                            selector: 'edge', 
+                            style: { 
+                                'label': 'data(label)', 
+                                'line-color': '#666',
+                                'target-arrow-shape': 'triangle',
+                                'target-arrow-color': '#666',
+                                'curve-style': 'bezier',
+                                'font-size': '10px',
+                                'text-rotation': 'autorotate'
+                            } 
+                        }
+                    ],
+                    layout: { 
+                        name: 'cose',
+                        animate: true,
+                        animationDuration: 1000,
+                        nodeDimensionsIncludeLabels: true,
+                        nodeRepulsion: 8000,
+                        idealEdgeLength: 200,
+                        edgeElasticity: 100
+                    }
+                });
+                
+                // Add event listeners
+                cy.on('mouseover', 'node', function(e) {
+                    e.target.style('background-color', '#ff6b6b');
+                    // Show tooltip with full IP and classification info
+                    const node = e.target;
+                    const ip = node.id();
+                    if (ip.length > 15) {
+                        node.style('label', ip);
+                    }
+                    // Gather all fingerprints for this node from its edges
+                    const edges = node.connectedEdges();
+                    let fpSet = new Set();
+                    edges.forEach(edge => {
+                        const fp = edge.data('fingerprint');
+                        if (fp && fp.length > 0) {
+                            fp.split(';').forEach(f => fpSet.add(f));
+                        }
+                    });
+                    if (fpSet.size > 0) {
+                        node.qtip = document.createElement('div');
+                        node.qtip.style.position = 'absolute';
+                        node.qtip.style.background = '#fff';
+                        node.qtip.style.border = '1px solid #0074D9';
+                        node.qtip.style.padding = '8px';
+                        node.qtip.style.borderRadius = '4px';
+                        node.qtip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        node.qtip.style.zIndex = 1000;
+                        node.qtip.innerText = 'Classifications:\n' + Array.from(fpSet).join('\n');
+                        document.body.appendChild(node.qtip);
+                        const pos = e.renderedPosition || e.position || {x:0, y:0};
+                        node.qtip.style.left = (window.event ? window.event.pageX : pos.x) + 20 + 'px';
+                        node.qtip.style.top = (window.event ? window.event.pageY : pos.y) + 'px';
+                    }
+                });
+                
+                cy.on('mouseout', 'node', function(e) {
+                    e.target.style('background-color', '#0074D9');
+                    // Restore original label
+                    const node = e.target;
+                    const ip = node.id();
+                    if (ip.length > 15) {
+                        node.style('label', ip.substring(0, 12) + '...');
+                    }
+                    if (node.qtip) {
+                        document.body.removeChild(node.qtip);
+                        node.qtip = null;
+                    }
+                });
+
+                // Edge hover: show fingerprint info as tooltip
+                cy.on('mouseover', 'edge', function(e) {
+                    const edge = e.target;
+                    const fp = edge.data('fingerprint');
+                    if (fp && fp.length > 0) {
+                        edge.qtip = document.createElement('div');
+                        edge.qtip.style.position = 'absolute';
+                        edge.qtip.style.background = '#fff';
+                        edge.qtip.style.border = '1px solid #0074D9';
+                        edge.qtip.style.padding = '8px';
+                        edge.qtip.style.borderRadius = '4px';
+                        edge.qtip.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        edge.qtip.style.zIndex = 1000;
+                        edge.qtip.innerText = 'Fingerprint(s):\n' + fp.split(';').join('\n');
+                        document.body.appendChild(edge.qtip);
+                        const pos = e.renderedPosition || e.position || {x:0, y:0};
+                        edge.qtip.style.left = (window.event ? window.event.pageX : pos.x) + 20 + 'px';
+                        edge.qtip.style.top = (window.event ? window.event.pageY : pos.y) + 'px';
+                    }
+                });
+                cy.on('mouseout', 'edge', function(e) {
+                    const edge = e.target;
+                    if (edge.qtip) {
+                        document.body.removeChild(edge.qtip);
+                        edge.qtip = null;
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading graph data:', error);
+                document.getElementById('cy').innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Error loading network data. Please try uploading a PCAP file first.</div>';
+            });
+
+        function resetLayout() {
+            if (cy) {
+                cy.layout({ name: 'cose' }).run();
+            }
+        }
+
+        function fitView() {
+            if (cy) {
+                cy.fit();
+            }
+        }
+
+        function exportData() {
+            if (cy) {
+                const data = {
+                    nodes: cy.nodes().map(node => ({ id: node.id() })),
+                    edges: cy.edges().map(edge => ({ 
+                        source: edge.source().id(), 
+                        target: edge.target().id(), 
+                        label: edge.data('label') 
+                    }))
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'network_topology.json';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        function applyFilter() {
+            const filter = document.getElementById('filterInput').value.trim().toLowerCase();
+            if (!cy || !filter) return;
+            cy.elements().remove();
+            // Filter edges by fingerprint info
+            const filteredEdges = allElements.filter(el => el.data && el.data.fingerprint && el.data.fingerprint.toLowerCase().includes(filter));
+            // Find all nodes that are endpoints of filtered edges
+            const nodeIds = new Set();
+            filteredEdges.forEach(edge => {
+                nodeIds.add(edge.data.source);
+                nodeIds.add(edge.data.target);
+            });
+            const filteredNodes = allElements.filter(el => el.data && nodeIds.has(el.data.id));
+            cy.add(filteredNodes.concat(filteredEdges));
+            cy.layout({ name: 'cose' }).run();
+        }
+        function clearFilter() {
+            if (!cy) return;
+            cy.elements().remove();
+            cy.add(allElements);
+            cy.layout({ name: 'cose' }).run();
+            document.getElementById('filterInput').value = '';
+        }
+    </script>
+</body>
+</html>

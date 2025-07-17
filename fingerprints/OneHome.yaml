@@ -1,0 +1,43 @@
+fingerprint:
+  header:
+    name:
+      _text: OneHome
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of OneHome Remote Access traffic.
+        This fingerprint looks for evidence of OneHome Service Port traffic.
+  filter:
+  - for: ' Remote Access'
+    name: Remote Access
+    dstport:
+      _text: '2198'
+  - for: ' Service Port'
+    name: Service Port
+    dstport:
+      _text: '2199'
+  payload:
+  - for: ' Remote Access'
+    description:
+      _text: OneHome Remote Access
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: OneHome Remote Access
+  - for: ' Service Port'
+    description:
+      _text: OneHome Remote Access Service port
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: Product
+            _text: OneHome Remote Access Service port

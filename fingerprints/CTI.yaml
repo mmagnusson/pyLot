@@ -1,0 +1,45 @@
+fingerprint:
+  header:
+    name:
+      _text: CTI
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of CTI Program Load traffic. This
+        fingerprint looks for evidence of CTI System Msg traffic.
+  filter:
+  - for: Program Load
+    name: DstPort
+    dstport:
+      _text: '4452'
+  - for: System Message
+    name: DstPort
+    dstport:
+      _text: '4451'
+  payload:
+  - for: Program Load
+    description:
+      _text: Tags the CTI Program Load
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: CT Program Load
+  - for: System Message
+    description:
+      _text: Tags the CT Discovery Protocol
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: CT System Message

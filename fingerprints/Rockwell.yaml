@@ -1,0 +1,64 @@
+fingerprint:
+  '{http://www.w3.org/2001/xmlschema-instance}nonamespaceschemalocation': ../../../src/core/fingerprint/fingerprint3.xsd
+  header:
+    name:
+      _text: Rockwell
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Rockwell CSP2, CSP3, CSP1,
+        and Encapsulation traffic.
+  filter:
+  - for: CSP1
+    srcport:
+      _text: '2221'
+  - for: CSP2
+    dstport:
+      _text: '2222'
+  - for: CSP3
+    dstport:
+      _text: '0'
+  - for: Encapsulation
+    srcport:
+      _text: '44818'
+  payload:
+  - for: CSP1
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Rockwell
+            _text: CSP1
+  - for: CSP2
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Rockwell
+            _text: CSP2
+  - for: CSP3
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Rockwell
+            _text: CSP3
+  - for: Encapsulation
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Rockwell
+            _text: ROCWELL-ENCAP

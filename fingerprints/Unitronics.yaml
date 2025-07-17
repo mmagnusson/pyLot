@@ -1,0 +1,63 @@
+fingerprint:
+  header:
+    name:
+      _text: Unitronics
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Unitronics Socket TCP slave communication.
+  filter:
+  - for: Unitronics Socket1
+    name: Socket1
+    dstport:
+      _text: '20256'
+  - for: Unitronics Socket2
+    name: Socket2
+    dstport:
+      _text: '502'
+  - for: Unitronicsw Socket3
+    name: Socket2
+    dstport:
+      _text: '20257'
+  payload:
+  - for: Unitronics Socket1
+    description:
+      _text: PLC Socket Slave connection over TCP 20256
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          role:
+            _text: SLAVE
+          detail:
+            name: Product
+            _text: Socket1
+  - for: Unitronics Socket2
+    description:
+      _text: PLC Socket Slave connection over TCP 502
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: Product
+            _text: Socket2
+  - for: Unitronicsw Socket3
+    description:
+      _text: PLC Socket Slave connection over TCP 20257
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: PLC
+          role:
+            _text: SLAVE
+          detail:
+            name: Product
+            _text: Socket3

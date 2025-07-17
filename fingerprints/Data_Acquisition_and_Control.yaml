@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: Data Acquisition and Control
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of Data Acquisition and Control
+        traffic.
+  filter:
+    for: IDAC
+    name: Intelligent Data Acquisition and Control
+    dstport:
+      _text: '3881'
+  payload:
+    for: IDAC
+    description:
+      _text: Tags Intelligent Data Acquisition and Control
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: Intelligent Data Acquisition and Control

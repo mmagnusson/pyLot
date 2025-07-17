@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: IP Control Systems Ltd
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of IP Control Systems traffic. Write
+        standard input info about active interprocess communication facilities.
+  filter:
+    for: ICS Command
+    name: DstPort
+    dstport:
+      _text: '3743'
+  payload:
+    for: ICS Command
+    description:
+      _text: This fingerprint looks for the evidence of IP Control Systems traffic.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: IP Control Systems Ltd

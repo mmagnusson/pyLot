@@ -1,0 +1,170 @@
+fingerprint:
+  header:
+    name:
+      _text: Rockwell RSBizWare
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of RSBizWare traffic.
+  filter:
+  - for: RPC Production Server
+    name: RPC Production
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4120'
+  - for: RPC Server Manager
+    name: RPC Server Manager
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4121'
+  - for: RPC PlantMetrics Server
+    name: RPC PlantMetrics
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4122'
+  - for: RPC Task Manager
+    name: RPC Task Manager
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4123'
+  - for: RPC Scheduler Server
+    name: RPC Scheduler
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4124'
+  - for: RPC Scheduler CTP Server
+    name: RPC Scheduler CTP
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '4125'
+  - for: HTTP Production Server
+    name: HTTP Production
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '8080'
+  - for: HTTP Server Manager
+    name: HTTP Server Manager
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '8081'
+  payload:
+  - for: RPC Production Server
+    description:
+      _text: Rockwell RSBizWare Production Server payload that tags TCP traffic over
+        the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Production Server
+  - for: RPC Server Manager
+    description:
+      _text: Rockwell RSBizWare Server Manager payload that tags TCP traffic over
+        the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: OPERATOR
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Server Manager
+  - for: RPC PlantMetrics Server
+    description:
+      _text: Rockwell RSBizWare PlantMetrics Server payload that tags TCP traffic
+        over the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Production Server
+  - for: RPC Task Manager
+    description:
+      _text: Rockwell RSBizWare Task Manager payload that tags TCP traffic over the
+        destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: OPERATOR
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Task Manager
+  - for: RPC Scheduler Server
+    description:
+      _text: Rockwell RSBizWare Scheduler Server payload that tags TCP traffic over
+        the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Scheduler Server
+  - for: RPC Scheduler CTP Server
+    description:
+      _text: Rockwell RSBizWare Scheduler CTP Server payload that tags TCP traffic
+        over the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Scheduler CTP Server
+  - for: HTTP Production Server
+    description:
+      _text: Rockwell RSBizWare Production Server payload that tags TCP traffic over
+        the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Scheduler CTP Server
+  - for: HTTP Server Manager
+    description:
+      _text: Rockwell RSBizWare Server Manager payload that tags TCP traffic over
+        the destination port
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          role:
+            _text: OPERATOR
+          detail:
+            name: Product
+            _text: Rockwell RSBizWare-Scheduler CTP Server

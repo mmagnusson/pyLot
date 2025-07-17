@@ -1,0 +1,342 @@
+fingerprint:
+  header:
+    name:
+      _text: Browser Protocol
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint tags the Host Name and the OS version in the Browser
+        protocol.
+  filter:
+  - for: Browser Protocol
+    name: SrcPort
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol
+    name: DstPort
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: Browser Protocol2
+    name: SrcPort2
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol2
+    name: DstPort2
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: Browser Protocol3
+    name: SrcPort3
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol3
+    name: DstPort3
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: Browser Protocol4
+    name: SrcPort4
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol4
+    name: DstPort4
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: Browser Protocol5
+    name: SrcPort5
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol5
+    name: DstPort5
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  - for: Browser Protocol6
+    name: SrcPort6
+    transportprotocol:
+      _text: '17'
+    srcport:
+      _text: '138'
+  - for: Browser Protocol6
+    name: DstPort6
+    transportprotocol:
+      _text: '17'
+    dstport:
+      _text: '138'
+  payload:
+  - for: Browser Protocol
+    description:
+      _text: Tags 0F00C0D4 Hex pattern in payload. Extracting from bytes 174-182 for
+        Windows Name and bytes 190-192 for Version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 0F00C0D4
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Host Name
+            from: '174'
+            to: '182'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+  - for: Browser Protocol2
+    description:
+      _text: Tags 0F0080FC Hex pattern in payload. Extracting from bytes 174-190 for
+        Windows Name and bytes 190-192 for Version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 0F0080FC
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Host Name
+            from: '174'
+            to: '190'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+  - for: Browser Protocol3
+    description:
+      _text: Tags 010080FC Hex pattern in payload. Extracting from bytes 174-189 for
+        Windows Name and bytes 190-192 for Version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 010080FC
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Host Name
+            from: '174'
+            to: '189'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+  - for: Browser Protocol4
+    description:
+      _text: Tags 0F162012 Hex pattern in payload. Extracting from bytes 174-189 for
+        Windows Name and bytes 190-192 for Version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 0F162012
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Host Name
+            from: '174'
+            to: '189'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+  - for: Browser Protocol5
+    description:
+      _text: Tags 010080A9 Hex pattern in payload. Extracting from bytes 174-190 for
+        Windows Name and bytes 190-192 for Version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 010080A9
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Host Name
+            from: '174'
+            to: '190'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX
+  - for: Browser Protocol6
+    description:
+      _text: Tags the Domain/Workgroup Accouncement in the Browser Protocol and matches
+        on 0C00A0BB Hex pattern in payload. Extracts bytes 174-190 for Domain/Workgroup
+        and bytes 190-192 for Windows version number.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: MicrosoftProtocol
+            _text: Microsoft Windows Browser Protocol
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'true'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 0C00A0BB
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: Domain/Workgroup
+            from: '174'
+            to: '190'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: STRING
+          - name: Windows Version
+            from: '190'
+            to: '192'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: HEX

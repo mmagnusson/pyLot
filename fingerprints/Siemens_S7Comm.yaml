@@ -1,0 +1,75 @@
+fingerprint:
+  header:
+    name:
+      _text: Siemens S7Comm
+    author:
+      _text: Default
+    description:
+      _text: ISO 8073 COTP 020f80 protocol usually rides on port 102. The first byte
+        is always x32 as protocol identifier which is the protocol ID 020f80 32
+  filter:
+  - for: S7Comm Master
+    name: Master
+    dstport:
+      _text: '102'
+    transportprotocol:
+      _text: '6'
+  - for: S7Comm Slave
+    name: Slave
+    srcport:
+      _text: '102'
+    transportprotocol:
+      _text: '6'
+  payload:
+  - for: S7Comm Master
+    description:
+      _text: Payload matches on the ISO8073/X.224 COTP HEX pattern
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 02F08032
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details:
+            category:
+              _text: MTU
+            role:
+              _text: MASTER
+            detail:
+              name: S7Communication
+              _text: COPT
+  - for: S7Comm Slave
+    description:
+      _text: Payload matches on the ISO8073/X.224 COTP HEX pattern
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'false'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 02F08032
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details:
+            category:
+              _text: PLC
+            role:
+              _text: SLAVE
+            detail:
+              name: S7Communication
+              _text: COPT

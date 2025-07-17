@@ -1,0 +1,27 @@
+fingerprint:
+  header:
+    name:
+      _text: HMS HICP Port
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of HMS HICP Port traffic.
+  filter:
+    for: HICP
+    name: HMC HICP Port
+    dstport:
+      _text: '3250'
+  payload:
+    for: HICP
+    description:
+      _text: Acts as a translator between industrial control systems. It also detects
+        any Ethernet device on a local network.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: HMS HICP

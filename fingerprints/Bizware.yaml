@@ -1,0 +1,69 @@
+fingerprint:
+  header:
+    name:
+      _text: Bizware
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the evidence of Bizware Task Manager traffic.This
+        fingerprint looks for the evidence of Bizware Production Server traffic.This
+        fingerprint looks for the evidence of Bizware Server Manager traffic.This
+        fingerprint looks for the evidence of Bizware CTP Server traffic.This fingerprint
+        looks for the evidence of Bizware PlantMetrics Server traffic.
+  filter:
+  - for: ' Task Manager'
+    dstport:
+      _text: '4123'
+  - for: ' Production Server'
+    dstport:
+      _text: '4120'
+  - for: ' Server Manager'
+    dstport:
+      _text: '4121'
+  - for: ' CTP Server'
+    dstport:
+      _text: '4125'
+  - for: ' PlantMetrics Server'
+    dstport:
+      _text: '4122'
+  payload:
+  - for: ' Task Manager'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: BIZ-TASK-MANG
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Production Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: BIZ-PROD-SERV
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' Server Manager'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: BIZ-SERV-MANG
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' CTP Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: BIZ-CTP-SERV
+          from: CURSOR_START
+          to: CURSOR_END
+  - for: ' PlantMetrics Server'
+    always:
+      return:
+        confidence: '3'
+        extract:
+          name: BIZ-PLANTMET
+          from: CURSOR_START
+          to: CURSOR_END

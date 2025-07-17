@@ -1,0 +1,69 @@
+fingerprint:
+  header:
+    name:
+      _text: EGD
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint identifies evidence of EGD Type:13 Version:1 traffic
+        over 18246.
+  filter:
+    for: EGD
+    name: Ethernet Global Data
+    dstport:
+      _text: '18246'
+    srcport:
+      _text: '18246'
+  payload:
+    for: EGD
+    description:
+      _text: Protocol that enables producer (server) to share a portion of its memory
+        to all the consumer (clients) at the schedule periodic rate protocol developed
+        for GE Fanuc PLCs to change data between PLCs/GE drive systems. The protocol
+        uses UDP over Ethernet layers for exchanging data.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          detail:
+            name: ICSProtocol
+            _text: Ethernet Global Data
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '2'
+      relative: 'true'
+      within: '0'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 0D01
+      andthen:
+        return:
+          direction: SOURCE
+          confidence: '5'
+          details: {}
+          extract:
+          - name: RequestID
+            from: '2'
+            to: '4'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              convert: INTEGER
+          - name: ProducerID-IP_Address
+            from: '4'
+            to: '8'
+            maxlength: '1024'
+            endian: BIG
+            post:
+              convert: RAW_BYTES
+          - name: ExchangeID
+            from: '8'
+            to: '12'
+            maxlength: '1024'
+            endian: LITTLE
+            post:
+              convert: HEX

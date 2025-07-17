@@ -1,0 +1,590 @@
+fingerprint:
+  header:
+    name:
+      _text: Siemens APOGEE
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint finds the version number of the device in the APOGEE
+        network. This fingerprint finds the AEM (APOGEE Ethernet Microserver). This
+        fingerprint finds the hardware type of the device in the APOGEE network. This
+        fingerprint finds the hardware type of the device in the APOGEE network. This
+        fingerprint finds the last link date of the device in the APOGEE network.
+        This fingerprint finds the Ethernet field nael traffic. This fingerprint finds
+        the AEM device. This fingerprint finds the AEM device. This fingerprint finds
+        the AEM device. This fingerprint finds the AEM device. This fingerprint finds
+        the AEM device. This fingerprint finds the License Manager. This fingerprint
+        finds the Device Field Panel. This fingerprint finds the Device Field Panel.
+        This fingerprint finds the Insight Async Service. This fingerprint finds the
+        Objectivity Database 1 and 2. This fingerprint finds the Objectivity Insight
+        1. This fingerprint finds the AMS Service and Lock server and AEM200. This
+        fingerprint finds Dialogic Board. This fingerprint finds the utility cast
+        manager. This fingerprint finds the UDP BACnet
+  filter:
+  - for: Network-Version Number
+    name: Version Number
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: Network-Hardware Type
+    name: Hardware Type
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: Network-Panel Name
+    name: Panel Name
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: Network-Link Date
+    name: Link Date
+    transportprotocol:
+      _text: '6'
+    srcport:
+      _text: '5033'
+  - for: Ethernet RS485 field panel
+    name: Field Panel
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '3001'
+  - for: AEM Device
+    name: Field Panel
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '3002'
+  - for: License Manager
+    name: Manager
+    dstport:
+      _text: '5099'
+  - for: Device Field Panel
+    name: Field Panel
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5441'
+  - for: Insight Async Service
+    name: Async Service
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '5442'
+  - for: Objectivity Database 1
+    name: Database 1
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6775'
+  - for: Objectivity Database 2
+    name: Database 2
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6888'
+  - for: Objectivity Insight 1
+    name: Insight 1
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6889'
+  - for: Objectivity Insight 2
+    name: Insight 2
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6780'
+  - for: Objectivity AMS Service
+    name: AMS Service
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6779'
+  - for: Objectivity Lock Server
+    name: Lock Server
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '6780'
+  - for: AEM200 Communication
+    name: AEM200 Communication
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '999'
+  - for: Dialogic Board 1
+    name: Dialogic Board 1
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '12001'
+  - for: Dialogic Board 2
+    name: Dialogic Board 2
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '12002'
+  - for: Dialogic Board 3
+    name: Dialogic Board 3
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '12003'
+  - for: Dialogic Board 4
+    name: Dialogic Board 4
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '12004'
+  - for: Dialogic Board 5
+    name: Dialogic Board 5
+    transportprotocol:
+      _text: '6'
+    dstport:
+      _text: '12005'
+  - for: Utility Cast Manager
+    name: Manager
+    dstport:
+      _text: '30400'
+  - for: BACnet Field Panels
+    name: BACnet
+    dstport:
+      _text: '47808'
+  payload:
+  - for: Network-Version Number
+    description:
+      _text: Tags APOGEE network version number by HEX match and extracts the version
+        number.
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C56657273696F6E4E756D6265723E
+      andthen:
+        match:
+          offset: '0'
+          reverse: 'true'
+          nocase: 'false'
+          depth: '0'
+          relative: 'true'
+          within: '0'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+              relative: 'false'
+              offset: '0'
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                role:
+                  _text: SERVER
+                detail:
+                  name: Product
+                  _text: APOGEE - Network Version Number
+  - for: Network-Hardware Type
+    description:
+      _text: Tags APOGEE network hardware type by HEX match and extracts the model
+        type
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C4861726477617265547970653E
+      andthen:
+        match:
+          offset: '0'
+          reverse: 'true'
+          nocase: 'false'
+          depth: '0'
+          relative: 'true'
+          within: '0'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+              relative: 'false'
+              offset: '0'
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                role:
+                  _text: SERVER
+                detail:
+                  name: Product
+                  _text: APOGEE-Network Hardware Type
+              extract:
+                name: Model
+                from: CURSOR_START
+                to: CURSOR_END
+                maxlength: '1024'
+                endian: BIG
+                post:
+                  convert: INTEGER
+  - for: Network-Panel Name
+    description:
+      _text: Tags APOGEE network panel name HEX match and extracts the panel name
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C50616E656C204E616D653D22
+      andthen:
+        match:
+          offset: '0'
+          reverse: 'true'
+          nocase: 'false'
+          depth: '0'
+          relative: 'true'
+          within: '0'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: '22'
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+              relative: 'false'
+              offset: '0'
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                role:
+                  _text: SERVER
+                detail:
+                  name: Product
+                  _text: APOGEE - Network Panel Name
+              extract:
+                name: 'Panel Name: '
+                from: CURSOR_START
+                to: CURSOR_END
+                maxlength: '1024'
+                endian: BIG
+                post:
+                  convert: STRING
+  - for: Network-Link Date
+    description:
+      _text: Tags APOGEE network link date by HEX match and extracts the link date.
+    match:
+      offset: '0'
+      reverse: 'true'
+      nocase: 'false'
+      depth: '0'
+      relative: 'true'
+      within: '65535'
+      movecursors: 'true'
+      content:
+        type: HEX
+        _text: 3C4C696E6B446174653E
+      andthen:
+        match:
+          offset: '0'
+          reverse: 'true'
+          nocase: 'false'
+          depth: '0'
+          relative: 'true'
+          within: '0'
+          movecursors: 'false'
+          content:
+            type: HEX
+            _text: 3C
+          andthen:
+            anchor:
+              cursor: END
+              position: CURSOR_MAIN
+              relative: 'false'
+              offset: '0'
+            return:
+              direction: SOURCE
+              confidence: '3'
+              details:
+                category:
+                  _text: ICS_HOST
+                role:
+                  _text: SERVER
+                detail:
+                  name: Product
+                  _text: APOGEE - Network Link Date
+              extract:
+                name: 'Link Date:'
+                from: CURSOR_START
+                to: CURSOR_END
+                maxlength: '1024'
+                endian: BIG
+                post:
+                  convert: INTEGER
+  - for: Ethernet RS485 field panel
+    description:
+      _text: Tags APOGEE field panels.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Ethernet Field Panel
+  - for: AEM Device
+    description:
+      _text: Tags APOGEE AEM Device.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE AEM Device
+  - for: License Manager
+    description:
+      _text: Tags APOGEE License Manager.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE License Manager
+  - for: Device Field Panel
+    description:
+      _text: Tags APOGEE Device Field Panel.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Device Field Panel
+  - for: Insight Async Service
+    description:
+      _text: Tags APOGEE Insight Async Service.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Insight Async Service
+  - for: Objectivity Database 1
+    description:
+      _text: Tags APOGEE Objectivity Database 1.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: APOGEE Objectivity Database 1
+  - for: Objectivity Database 2
+    description:
+      _text: Tags APOGEE Device Field Panel 2.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: APOGEE Objectivity Database 2
+  - for: Objectivity Insight 1
+    description:
+      _text: Tags APOGEE Objectivity Insight 1.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Objectivity Insight 1
+  - for: Objectivity Insight 2
+    description:
+      _text: Tags APOGEE Objectivity Insight 2.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Objectivity Insight 2
+  - for: Objectivity AMS Service
+    description:
+      _text: Tags APOGEE Objectivity AMS Service.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: APOGEE Objectivity AMS Service
+  - for: Objectivity Lock Server
+    description:
+      _text: Tags APOGEE Objectivity Lock Server.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          role:
+            _text: SERVER
+          detail:
+            name: Product
+            _text: APOGEE Objectivity Lock Server
+  - for: AEM200 Communication
+    description:
+      _text: Tags APOGEE AEM200 Communication.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE AEM200 Communication
+  - for: Dialogic Board 1
+    description:
+      _text: Tags APOGEE Dialogic Board 1.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Dialogic Board 1
+  - for: Dialogic Board 2
+    description:
+      _text: Tags APOGEE Dialogic Board 2.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Dialogic Board 2
+  - for: Dialogic Board 3
+    description:
+      _text: Tags APOGEE Dialogic Board 3.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Dialogic Board 3
+  - for: Dialogic Board 4
+    description:
+      _text: Tags APOGEE Dialogic Board 4.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Dialogic Board 4
+  - for: Dialogic Board 5
+    description:
+      _text: Tags APOGEE Dialogic Board 5.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Dialogic Board
+  - for: Utility Cast Manager
+    description:
+      _text: Tags APOGEE Utility Cast Manager.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE Utility Cast Manager
+  - for: BACnet Field Panels
+    description:
+      _text: Tags APOGEE BACnet Field Panels.
+    always:
+      return:
+        confidence: '5'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: Product
+            _text: APOGEE BACnet Field Panels

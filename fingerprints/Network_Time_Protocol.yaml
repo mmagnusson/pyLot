@@ -1,0 +1,28 @@
+fingerprint:
+  header:
+    name:
+      _text: Network Time Protocol
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for evidence of Network Time Protocol traffic.
+  filter:
+    for: NTP
+    name: Ports
+    srcport:
+      _text: '0'
+    dstport:
+      _text: '123'
+  payload:
+    for: NTP
+    description:
+      _text: This fingerprint looks for the evidence of Network Time Protocol traffic.
+    always:
+      return:
+        confidence: '4'
+        details:
+          category:
+            _text: ICS_HOST
+          detail:
+            name: ICSProtocol
+            _text: NTP

@@ -1,0 +1,44 @@
+fingerprint:
+  header:
+    name:
+      _text: Wonderware
+    author:
+      _text: Default
+    description:
+      _text: This fingerprint looks for the devices using the wonderware protocol.
+  filter:
+  - for: WonderwareDST
+    name: Dst
+    dstport:
+      _text: '5413'
+  - for: WonderwareSRC
+    name: Src
+    srcport:
+      _text: '5413'
+  payload:
+  - for: WonderwareDST
+    description:
+      _text: Wonderware IO Talk traffic that looks for the specific destination port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: WonderwareProtocol
+            _text: SuiteLink
+  - for: WonderwareSRC
+    description:
+      _text: Wonderware IO Talk traffic that looks for the specific source port.
+    always:
+      return:
+        direction: SOURCE
+        confidence: '5'
+        details:
+          category:
+            _text: HMI
+          detail:
+            name: WonderwareProtocol
+            _text: SuiteLink
