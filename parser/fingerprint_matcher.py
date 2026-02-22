@@ -1,6 +1,14 @@
 from parser.fingerprint_loader import load_fingerprints
 import binascii
 
+def extract_text(val, default=None):
+    """Extract text value from dict with _text key or return as-is."""
+    if isinstance(val, dict):
+        return val.get('_text', default)
+    if val is None:
+        return default
+    return val
+
 def extract_int(val, default=None):
     if isinstance(val, dict):
         val = val.get('_text', default)
@@ -76,7 +84,7 @@ def match_packet_to_fingerprint(pkt, fingerprints):
         if not filter_match:
             continue
         header = fp_data.get('header', {})
-        name = header.get('name') if isinstance(header, dict) else None
+        name = extract_text(header.get('name')) if isinstance(header, dict) else None
         payloads = fp_data.get('payload', [])
         if not isinstance(payloads, list):
             payloads = [payloads]
@@ -104,9 +112,9 @@ def match_packet_to_fingerprint(pkt, fingerprints):
                 details = ret.get('details', {})
             match_info = {
                 'fingerprint': name,
-                'category': details.get('category') if details else None,
-                'role': details.get('role') if details else None,
-                'ics_protocol': details.get('ics_protocol') or details.get('detail', {}).get('icsprotocol') if details else None,
+                'category': extract_text(details.get('category')) if details else None,
+                'role': extract_text(details.get('role')) if details else None,
+                'ics_protocol': extract_text(details.get('ics_protocol')) or extract_text(details.get('detail', {}).get('icsprotocol')) if details else None,
             }
             matches.append(match_info)
     return matches 
