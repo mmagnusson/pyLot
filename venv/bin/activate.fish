@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/mmagnusson/code/pymarlin/grassmarlin-lite/venv
+set -gx VIRTUAL_ENV /home/mmagnusson/code/pyLot/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
