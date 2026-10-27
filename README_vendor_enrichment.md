@@ -11,7 +11,7 @@ This document explains how to enable and use device vendor enrichment in the pyL
 
 ### 1. Prepare the OUI Database File
 - You need a file containing MAC address prefixes (OUIs) and their corresponding vendor names.
-- The file should be named `oui.csv` and placed in the `pylot/parser/` directory.
+- The file should be named `oui.csv` and placed in the `parser/` directory.
 - Each line should have the prefix and vendor, separated by a comma or tab. Example:
 
 ```
@@ -21,11 +21,11 @@ AABBCC,Example Vendor Inc.
 - Prefixes can be in any case, with or without colons/hyphens (they will be normalized automatically).
 
 ### 2. Place the File
-- Copy your OUI file to: `pylot/parser/oui.csv`
+- Copy your OUI file to: `parser/oui.csv`
 
 ### 3. Restart the Application
 - Restart pyLot to ensure the OUI database is loaded at startup.
-- If the file is missing or invalid, a warning will be printed and vendor enrichment will be skipped.
+- If the file is missing or invalid, a warning is logged and every device shows 'Unknown Vendor'.
 
 ### 4. Using the Feature
 - Upload a PCAP file or start live capture as usual.
@@ -39,7 +39,7 @@ AABBCC,Example Vendor Inc.
 
 ## Customization
 - You can use a more complete OUI database (e.g., from IEEE or Wireshark) for better coverage.
-- The lookup logic is in `pylot/parser/mac_lookup.py` if you wish to customize it.
+- The lookup logic is in `parser/mac_lookup.py` if you wish to customize it.
 
 ---
 

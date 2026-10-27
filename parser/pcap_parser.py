@@ -1,8 +1,10 @@
+import logging
 import pyshark
-from parser.mac_lookup import lookup_manufacturer, load_oui_database
+from parser.mac_lookup import lookup_manufacturer
 from parser.fingerprint_loader import load_fingerprints
 from parser.fingerprint_matcher import match_packet_to_fingerprint
-import os
+
+logger = logging.getLogger(__name__)
 
 fingerprints = load_fingerprints()
 
@@ -40,49 +42,44 @@ def get_mac(pkt, direction='src'):
         pass
     return ''
 
-def parse_pcap(file_path):
-    # Ensure OUI database is loaded in this process/thread
-    oui_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'oui.csv'))
-    print(f"[DEBUG] Loading OUI database in parse_pcap from: {oui_path}")
-    try:
-        load_oui_database(oui_path)
-    except Exception as e:
-        print(f"[DEBUG] Failed to load OUI database: {e}")
-    try:
-        cap = pyshark.FileCapture(file_path)
-        devices = set()
-        connections = set()
+def fingerprint_summary(pkt):
+    """Match pkt against all fingerprints and flatten the results to 'name|category|role|ics_protocol; ...'."""
+    # Store all matches as a string summary (could be improved to structured storage)
+    fp_matches = match_packet_to_fingerprint(pkt, fingerprints)
+    return '; '.join([f"{m['fingerprint']}|{m.get('category','')}|{m.get('role','')}|{m.get('ics_protocol','')}" for m in fp_matches])
 
+def parse_pcap(file_path):
+    """
+    Returns (devices, connections) seen in a capture file. Raises if the file can't be read,
+    so callers can report the failure instead of storing an empty result.
+    """
+    cap = pyshark.FileCapture(file_path)
+    devices = {}  # ip -> (ip, mac, vendor); an IP can appear with several MACs, keep the first seen
+    connections = set()
+    skipped = 0
+    try:
         for pkt in cap:
+            # Check if packet has IP layer
+            if not hasattr(pkt, 'ip'):
+                continue
             try:
-                # Check if packet has IP layer
-                if not hasattr(pkt, 'ip'):
-                    continue
                 ip_src = pkt.ip.src
                 ip_dst = pkt.ip.dst
                 # Skip if source or destination IP is missing
                 if not ip_src or not ip_dst:
                     continue
-                proto = detect_protocol(pkt)
-                mac_src = get_mac(pkt, 'src')
-                mac_dst = get_mac(pkt, 'dst')
-                vendor_src = lookup_manufacturer(mac_src) if mac_src else ''
-                vendor_dst = lookup_manufacturer(mac_dst) if mac_dst else ''
-                # Fingerprint matching
-                fp_matches = match_packet_to_fingerprint(pkt, fingerprints)
-                # Store all matches as a string summary (could be improved to structured storage)
-                fp_summary = '; '.join([f"{m['fingerprint']}|{m.get('category','')}|{m.get('role','')}|{m.get('ics_protocol','')}" for m in fp_matches]) if fp_matches else ''
-                devices.add((ip_src, mac_src, vendor_src))
-                devices.add((ip_dst, mac_dst, vendor_dst))
-                connections.add((ip_src, ip_dst, proto, fp_summary))
-            except AttributeError as e:
-                # Skip packets without required attributes
-                continue
-            except Exception as e:
-                print(f"Error processing packet: {e}")
-                continue
+                # Everything that can fail runs first, so a skipped packet adds nothing
+                connection = (ip_src, ip_dst, detect_protocol(pkt), fingerprint_summary(pkt))
+                for ip, direction in ((ip_src, 'src'), (ip_dst, 'dst')):
+                    if ip not in devices:
+                        mac = get_mac(pkt, direction)
+                        devices[ip] = (ip, mac, lookup_manufacturer(mac) if mac else '')
+                connections.add(connection)
+            except Exception:
+                skipped += 1
+                logger.debug("Error processing packet", exc_info=True)
+    finally:
         cap.close()
-        return list(devices), list(connections)
-    except Exception as e:
-        print(f"Error parsing PCAP file: {e}")
-        return [], []
+    if skipped:
+        logger.warning("Skipped %d packets in %s that could not be processed", skipped, file_path)
+    return list(devices.values()), list(connections)

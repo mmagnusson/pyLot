@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# IDE
+.idea/
+
+# Runtime data
+db.sqlite3
+db.sqlite3-journal
+uploads/
