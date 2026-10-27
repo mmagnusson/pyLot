@@ -3,16 +3,17 @@
 This document explains how to enable and use device vendor enrichment in the pyLot web application. With this feature, devices detected from PCAP files or live capture will be enriched with vendor information based on their MAC addresses.
 
 ## How It Works
-- When a PCAP file is uploaded or live capture is running, pyLot extracts MAC addresses from packets (when available).
-- The first 3 bytes (OUI) of each MAC address are used to look up the device vendor using a local OUI database file.
-- The device's IP, MAC, and vendor are stored in the database and shown in the UI (if configured).
+- When a PCAP file is uploaded or live capture is running, pyLot records the MAC addresses each IP address is seen with, plus ARP replies.
+- The first 3 bytes (OUI) of a host's MAC address are used to look up its vendor in a local OUI database file.
+- Hosts on another network arrive with their router's MAC address, so pyLot doesn't credit that MAC to them. A MAC is treated as a router when ARP binds it to a different IPv4 address, or when it carries traffic for more than 3 IP addresses of the same family. Those hosts show "Reached via router" with the router's MAC instead of a vendor.
+- Each host's IP, MAC, and vendor are stored in the database and shown when you hover over the host in the graph.
 
 ## Setup Instructions
 
 ### 1. Prepare the OUI Database File
 - You need a file containing MAC address prefixes (OUIs) and their corresponding vendor names.
 - The file should be named `oui.csv` and placed in the `parser/` directory.
-- Each line should have the prefix and vendor, separated by a comma or tab. Example:
+- Each line should have the prefix and vendor, separated by a comma. Example:
 
 ```
 001A2B,Acme Corporation
@@ -29,8 +30,7 @@ AABBCC,Example Vendor Inc.
 
 ### 4. Using the Feature
 - Upload a PCAP file or start live capture as usual.
-- Devices with detected MAC addresses will be enriched with vendor info in the database.
-- (Optional) Update the UI to display vendor info for each device.
+- Hosts on the captured network segment are enriched with vendor info, shown in the graph's host details.
 
 ## Troubleshooting
 - If you see 'Unknown Vendor', the MAC prefix was not found in your OUI file.
@@ -43,4 +43,4 @@ AABBCC,Example Vendor Inc.
 
 ---
 
-For further enhancements (device type, fingerprinting, etc.), see the main README or contact the project maintainer. 
+Device type and role come from fingerprints; see the main README. 

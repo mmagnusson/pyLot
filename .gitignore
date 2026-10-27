@@ -11,3 +11,8 @@ venv/
 db.sqlite3
 db.sqlite3-journal
 uploads/
+pylot.sqlite3
+pylot.sqlite3-wal
+pylot.sqlite3-shm
+.pytest_cache/
+

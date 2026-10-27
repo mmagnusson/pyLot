@@ -52,6 +52,35 @@
             border-left: 4px solid #d9534f;
             color: #842029;
         }
+        .sessions {
+            margin-top: 30px;
+        }
+        .sessions table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .sessions th, .sessions td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .sessions a {
+            color: #0074D9;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .sessions a:hover {
+            text-decoration: underline;
+        }
+        .link-btn {
+            background: none;
+            border: none;
+            color: #d9534f;
+            cursor: pointer;
+            padding: 0;
+            font-size: 14px;
+        }
         .info {
             margin-top: 20px;
             padding: 15px;
@@ -77,15 +106,35 @@
             </form>
         </div>
         
+        {% if sessions %}
+        <div class="sessions">
+            <h2>Sessions</h2>
+            <table>
+                <tr><th>Name</th><th>Source</th><th>Status</th><th>Packets</th><th>Hosts</th><th>Created (UTC)</th><th></th></tr>
+                {% for s in sessions %}
+                <tr>
+                    <td><a href="{{ url_for('session_view', session_id=s.id) }}">{{ s.name }}</a></td>
+                    <td>{{ s.source }}</td>
+                    <td>{{ s.status }}{% if s.error %} <span title="{{ s.error }}">(error)</span>{% endif %}</td>
+                    <td>{{ '{:,}'.format(s.packet_count) }}</td>
+                    <td>{{ '{:,}'.format(s.host_count) }}</td>
+                    <td>{{ s.created_at }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" onsubmit="return confirm('Delete this session and its capture file?')">
+                            <button type="submit" class="link-btn">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+        {% endif %}
+
         <div class="info">
-            <h3>Supported Protocols:</h3>
-            <ul>
-                <li><strong>Modbus</strong> - Industrial automation protocol</li>
-                <li><strong>DNP3</strong> - Distributed Network Protocol</li>
-                <li><strong>BACnet</strong> - Building Automation and Control Networks</li>
-                <li><strong>And more being tested</strong></li>
-            </ul>
-            <p>The application will analyze your PCAP file and display the network topology with detected devices and connections.</p>
+            <h3>How it works</h3>
+            <p>Each upload becomes a session. pyLot maps the hosts and conversations in the capture and classifies
+               devices with GRASSMARLIN's fingerprints: Modbus, DNP3, BACnet, EtherNet/IP, S7, IEC 104, PROFINET
+               and over a hundred more industrial and IT protocols and vendors.</p>
         </div>
     </div>
 </body>
