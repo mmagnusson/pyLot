@@ -47,10 +47,7 @@ def read_capture(stream: BinaryIO) -> Iterator[Packet]:
     so stream must support peek() (any file opened with open(path, 'rb') or a subprocess stdout).
     Raises ValueError for unsupported link types; frames that fail to decode are logged and skipped.
     """
-    reader = dpkt.pcapng.Reader(stream) if stream.peek(4)[:4] == PCAPNG_MAGIC else dpkt.pcap.Reader(stream)
-    linktype = reader.datalink()
-    if linktype not in (dpkt.pcap.DLT_EN10MB, dpkt.pcap.DLT_LINUX_SLL, DLT_LINUX_SLL2) + RAW_IP_LINKTYPES + LOOPBACK_LINKTYPES:
-        raise ValueError(f'Unsupported capture link type {linktype}')
+    reader, linktype = _open(stream)
     skipped = 0
     for frame, (ts, buf) in enumerate(reader, start=1):
         try:
@@ -60,6 +57,21 @@ def read_capture(stream: BinaryIO) -> Iterator[Packet]:
             logger.debug("Could not decode frame %d", frame, exc_info=True)
     if skipped:
         logger.warning("Skipped %d frames that could not be decoded", skipped)
+
+def _open(stream):
+    try:
+        reader = dpkt.pcapng.Reader(stream) if stream.peek(4)[:4] == PCAPNG_MAGIC else dpkt.pcap.Reader(stream)
+    except dpkt.Error as e:  # e.g. a truncated header
+        raise ValueError(f'Not a readable capture: {e}') from e
+    linktype = reader.datalink()
+    if linktype not in (dpkt.pcap.DLT_EN10MB, dpkt.pcap.DLT_LINUX_SLL, DLT_LINUX_SLL2) + RAW_IP_LINKTYPES + LOOPBACK_LINKTYPES:
+        raise ValueError(f'Unsupported capture link type {linktype}')
+    return reader, linktype
+
+def check_capture(path):
+    """Raise ValueError unless path starts like a pcap/pcapng capture pyLot can decode."""
+    with open(path, 'rb') as f:
+        _open(f)
 
 def decode_frame(frame: int, ts: float, buf: bytes, linktype: int) -> Packet:
     pkt = Packet(frame=frame, time=float(ts), length=len(buf))

@@ -59,3 +59,33 @@ def test_missing_dumpcap_marks_the_session_failed(db_path, monkeypatch):
     assert live_capture.start_live_capture('eth9', db_path) is False
     session, _ = only_session(db_path)
     assert session['status'] == 'failed' and 'Could not start dumpcap' in session['error']
+
+def test_list_interfaces(monkeypatch):
+    output = '1. ens18\n2. any\n3. lo (Loopback)\n'
+    monkeypatch.setattr(live_capture.subprocess, 'run',
+                        lambda *a, **k: live_capture.subprocess.CompletedProcess(a, 0, stdout=output, stderr=''))
+    assert live_capture.list_interfaces() == ['ens18', 'any', 'lo']
+
+def test_list_interfaces_reports_dumpcap_errors(monkeypatch):
+    monkeypatch.setattr(live_capture.subprocess, 'run',
+                        lambda *a, **k: live_capture.subprocess.CompletedProcess(a, 1, stdout='', stderr='permission denied'))
+    with pytest.raises(RuntimeError, match='permission denied'):
+        live_capture.list_interfaces()
+
+def test_stopped_capture_is_not_a_failure(db_path, monkeypatch):
+    # dumpcap killed before writing anything: empty output, SIGTERM exit code
+    monkeypatch.setattr(live_capture.subprocess, 'Popen', lambda cmd, **kw: FakeDumpcap(returncode=-15))
+    assert live_capture.start_live_capture('eth9', db_path) is True
+    session, _ = only_session(db_path)
+    assert session['status'] == 'stopped' and session['error'] is None
+
+def test_launch_runs_in_the_background_and_stop_needs_a_running_capture(db_path, monkeypatch):
+    started = []
+    monkeypatch.setattr(live_capture, 'start_live_capture', lambda *args: started.append(args))
+    session_id = live_capture.launch('eth9', db_path, None)
+    live_capture.threading.enumerate()  # the thread may still be starting; join it below
+    for thread in live_capture.threading.enumerate():
+        if thread is not live_capture.threading.current_thread() and thread.daemon:
+            thread.join(timeout=5)
+    assert started == [('eth9', db_path, None, session_id)]
+    assert live_capture.stop(session_id) is False and not live_capture.is_running(session_id)

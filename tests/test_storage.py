@@ -1,7 +1,7 @@
 import pytest
 
 import storage
-from packet_builder import packet
+from packet_builder import ROUTER_MAC, packet
 from parser.analysis import CaptureAnalyzer
 from parser.pcap_parser import engine
 
@@ -62,6 +62,51 @@ def test_init_db_stops_captures_left_over_from_a_previous_run(tmp_path):
     storage.init_db(path)
     with storage.connect(path) as conn:
         assert storage.get_session(conn, session_id)['status'] == 'stopped'
+
+def test_init_db_fails_analyses_left_over_from_a_previous_run(tmp_path):
+    path = str(tmp_path / 'test.sqlite3')
+    storage.init_db(path)
+    with storage.connect(path) as conn:
+        session_id = storage.create_session(conn, 'x.pcap', 'upload', 'processing')
+    storage.init_db(path)
+    with storage.connect(path) as conn:
+        assert storage.get_session(conn, session_id)['status'] == 'failed'
+
+def routed_analyzer(remote_count):
+    """One local host talking to remote_count hosts on other networks, all through one router."""
+    analyzer = CaptureAnalyzer(engine)
+    for i in range(remote_count):
+        analyzer.add(packet(src='10.0.0.5', dst=f'198.51.100.{i + 1}', dst_mac=ROUTER_MAC, dst_port=443))
+        analyzer.add(packet(src=f'198.51.100.{i + 1}', dst='10.0.0.5', src_mac=ROUTER_MAC, src_port=443, dst_port=1234))
+    return analyzer
+
+def test_graph_groups_hosts_by_network(conn):
+    session_id = storage.create_session(conn, 'x', 'upload', 'ready')
+    storage.save_analysis(conn, session_id, routed_analyzer(5))
+    graph = storage.session_graph(conn, session_id)
+    assert not graph['collapsed'] and len(graph['nodes']) == 6
+    assert {g['id'] for g in graph['groups']} == {'10.0.0.0/24', f'via:{ROUTER_MAC}'}
+
+def test_graph_merges_many_hosts_behind_a_router(conn, monkeypatch):
+    monkeypatch.setattr(storage, 'COLLAPSE_EXTERNAL_THRESHOLD', 3)
+    session_id = storage.create_session(conn, 'x', 'upload', 'ready')
+    storage.save_analysis(conn, session_id, routed_analyzer(5))
+    graph = storage.session_graph(conn, session_id)
+    assert graph['collapsed'] and graph['external_hosts'] == 5
+    merged = next(n for n in graph['nodes'] if n['id'] == f'via:{ROUTER_MAC}')
+    assert merged['merged'] == 5 and merged['packets_sent'] == 5
+    edges = {(e['source'], e['target']): e for e in graph['edges']}
+    assert edges[('10.0.0.5', f'via:{ROUTER_MAC}')]['flows'] == 5
+    assert len(storage.session_graph(conn, session_id, collapse_external=False)['nodes']) == 6
+
+def test_host_sorting_handles_ipv4_and_ipv6_together(conn):
+    session_id = storage.create_session(conn, 'x', 'upload', 'ready')
+    analyzer = CaptureAnalyzer(engine)
+    for src, dst in (('10.0.0.10', '10.0.0.9'), ('fe80::1', 'fe80::2')):
+        analyzer.add(packet(src=src, dst=dst))
+    storage.save_analysis(conn, session_id, analyzer)
+    hosts, total = storage.list_hosts(conn, session_id, sort='ip')
+    assert [h['ip'] for h in hosts] == ['10.0.0.9', '10.0.0.10', 'fe80::1', 'fe80::2'] and total == 4
 
 def test_update_session_rejects_unknown_fields(conn):
     with pytest.raises(ValueError):

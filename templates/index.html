@@ -73,6 +73,28 @@
         .sessions a:hover {
             text-decoration: underline;
         }
+        .capture-form {
+            margin-top: 20px;
+            text-align: center;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .capture-form select, .capture-form input[type=text] {
+            padding: 9px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+            margin: 0 6px 10px 0;
+        }
+        .capture-form input[type=text] {
+            width: 280px;
+        }
+        .capture-note {
+            font-size: 13px;
+            color: #842029;
+        }
         .link-btn {
             background: none;
             border: none;
@@ -104,6 +126,18 @@
                 </div>
                 <input type="submit" value="Analyze Network Traffic" class="submit-btn">
             </form>
+        </div>
+
+        <div class="capture-form">
+            <h2>Capture Live Traffic</h2>
+            <form action="/captures" method="post">
+                <select name="interface" id="interface" required>
+                    <option value="">Loading interfaces…</option>
+                </select>
+                <input type="text" name="capture_filter" maxlength="500" placeholder="Optional capture filter, e.g. not port 22">
+                <input type="submit" value="Start Capture" class="submit-btn" id="capture-button" disabled>
+            </form>
+            <p id="capture-note" class="capture-note"></p>
         </div>
         
         {% if sessions %}
@@ -137,5 +171,20 @@
                and over a hundred more industrial and IT protocols and vendors.</p>
         </div>
     </div>
+    <script>
+        // Listing interfaces runs dumpcap, so do it after the page has loaded
+        fetch('/api/interfaces').then(response => response.json()).then(data => {
+            const select = document.getElementById('interface');
+            select.replaceChildren();
+            data.interfaces.forEach(name => select.append(new Option(name, name)));
+            if (data.interfaces.length) {
+                document.getElementById('capture-button').disabled = false;
+            } else {
+                select.append(new Option('No interfaces available', ''));
+                document.getElementById('capture-note').textContent =
+                    data.error ? `Live capture is unavailable: ${data.error}` : 'dumpcap found no interfaces to capture on.';
+            }
+        });
+    </script>
 </body>
 </html>

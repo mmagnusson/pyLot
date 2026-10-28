@@ -26,6 +26,8 @@ def client(tmp_path, monkeypatch):
     uploads = tmp_path / 'uploads'
     uploads.mkdir()
     monkeypatch.setitem(app_module.app.config, 'UPLOAD_FOLDER', str(uploads))
+    # Run background analysis inline so tests see its results immediately
+    monkeypatch.setattr(app_module, 'submit', lambda fn, *args: fn(*args))
     return app_module.app.test_client()
 
 def upload(client, data=MODBUS_PCAP, name='modbus.pcap', **kwargs):
@@ -69,12 +71,26 @@ def test_unreadable_capture_is_reported_and_discarded(client):
     assert response.status_code == 400 and b'link type' in response.data
     assert uploaded_files(client) == [] and client.get('/api/sessions/1/graph').status_code == 404
 
-def test_error_messages_are_escaped(client, monkeypatch):
+def test_analysis_failures_mark_the_session_failed_and_are_escaped(client, monkeypatch):
     def explode(path):
         raise RuntimeError('<script>alert(1)</script>')
     monkeypatch.setattr(app_module, 'parse_pcap', explode)
-    response = upload(client)
-    assert response.status_code == 500 and b'&lt;script&gt;' in response.data and b'<script>alert' not in response.data
+    assert upload(client).status_code == 302
+    session = client.get('/api/sessions/1').get_json()
+    assert session['status'] == 'failed' and '<script>alert(1)</script>' in session['error']
+    page = client.get('/').data
+    assert b'&lt;script&gt;' in page and b'<script>alert' not in page
+    assert uploaded_files(client) == []
+
+def test_uploads_are_analyzed_in_the_background(client, monkeypatch):
+    jobs = []
+    monkeypatch.setattr(app_module, 'submit', lambda fn, *args: jobs.append((fn, args)))
+    assert upload(client).status_code == 302
+    assert client.get('/api/sessions/1').get_json()['status'] == 'processing'
+    assert client.post('/sessions/1/delete').status_code == 409
+    fn, args = jobs.pop()
+    fn(*args)
+    assert client.get('/api/sessions/1').get_json()['status'] == 'ready'
 
 @pytest.mark.parametrize('headers', [{'Origin': 'http://evil.example'}, {'Referer': 'http://evil.example/page'}])
 def test_cross_site_posts_are_refused(client, headers):
@@ -106,4 +122,53 @@ def test_capturing_sessions_cannot_be_deleted(client):
 def test_missing_sessions_are_404(client):
     assert client.get('/sessions/99').status_code == 404
     assert client.get('/api/sessions/99/graph').status_code == 404
+    assert client.get('/api/sessions/99').get_json() == {'error': 'Not found'}
     assert client.post('/sessions/99/delete').status_code == 404
+    assert client.post('/sessions/99/stop').status_code == 404
+
+def test_host_and_flow_tables(client):
+    upload(client)
+    data = client.get('/api/sessions/1/hosts?sort=packets_sent&order=desc&limit=1').get_json()
+    assert data['total'] == 2 and len(data['hosts']) == 1
+    assert client.get('/api/sessions/1/hosts?q=slave').get_json()['hosts'][0]['ip'] == '10.0.0.3'
+    flows = client.get('/api/sessions/1/flows?host=10.0.0.3&q=502').get_json()
+    assert flows['total'] == 2 and {f['protocol'] for f in flows['flows']} == {'Modbus'}
+    assert client.get('/api/sessions/1/flows?limit=abc').status_code == 400
+
+def test_host_detail(client):
+    upload(client)
+    host = client.get('/api/sessions/1/hosts/10.0.0.3').get_json()
+    assert host['role'] == 'SLAVE' and host['flow_count'] == 2
+    assert {'fingerprint': 'MODBUS', 'name': 'Unit', 'value': '0A'}.items() <= next(e for e in host['evidence'] if e['name'] == 'Unit').items()
+    assert client.get('/api/sessions/1/hosts/10.9.9.9').status_code == 404
+
+def test_csv_exports(client):
+    upload(client)
+    hosts = client.get('/sessions/1/hosts.csv')
+    assert hosts.mimetype == 'text/csv' and hosts.data.decode().splitlines()[0].startswith('ip,mac,vendor')
+    assert 'MODBUS' in hosts.data.decode()
+    flows = client.get('/sessions/1/flows.csv').data.decode().splitlines()
+    assert flows[0].startswith('src,dst,transport') and len(flows) == 3
+
+def test_start_capture_from_the_page(client, monkeypatch):
+    launched = []
+    monkeypatch.setattr(app_module.live_capture, 'list_interfaces', lambda: ['eth9'])
+    monkeypatch.setattr(app_module.live_capture, 'launch', lambda *args: launched.append(args) or 7)
+    response = client.post('/captures', data={'interface': 'eth9', 'capture_filter': 'not port 22'})
+    assert response.headers['Location'] == '/sessions/7'
+    assert launched == [('eth9', app_module.DB_PATH, 'not port 22')]
+    assert client.post('/captures', data={'interface': 'wlan-evil'}).status_code == 400
+    assert client.post('/captures', data={'interface': 'eth9', 'capture_filter': 'x' * 501}).status_code == 400
+
+def test_capture_unavailable(client, monkeypatch):
+    def unavailable():
+        raise RuntimeError("dumpcap isn't installed")
+    monkeypatch.setattr(app_module.live_capture, 'list_interfaces', unavailable)
+    assert client.get('/api/interfaces').get_json() == {'interfaces': [], 'error': "dumpcap isn't installed"}
+    assert client.post('/captures', data={'interface': 'eth9'}).status_code == 503
+
+def test_stopping_a_capture_this_process_no_longer_runs(client):
+    with storage.connect(app_module.DB_PATH) as conn:
+        session_id = storage.create_session(conn, 'Live capture on eth9', 'live', 'capturing')
+    assert client.post(f'/sessions/{session_id}/stop').status_code == 302
+    assert client.get(f'/api/sessions/{session_id}').get_json()['status'] == 'stopped'

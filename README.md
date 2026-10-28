@@ -6,13 +6,16 @@ Python web application.
 ## Features
 
 - Upload PCAP or PCAPNG captures; each upload becomes a saved session you can revisit or delete
-- Optional live capture from a network interface, saved as its own session
+- Live capture from a network interface, started and stopped from the web page, saved as its own session
 - Classifies hosts with GRASSMARLIN's fingerprint engine and its 118 stock fingerprints (Modbus,
   DNP3, BACnet, EtherNet/IP, S7, IEC 60870-5-104, PROFINET, vendor-specific protocols and more)
 - Loads fingerprints in GRASSMARLIN's own XML format as well as the YAML conversions in `fingerprints/`
 - Hosts, flows, MAC addresses and ARP bindings, with MAC vendor lookup that doesn't credit a
   router's MAC to the remote hosts behind it
-- Network topology graph, colored by device category
+- Network graph grouped by network, colored by device category and shaped by role; hosts behind a
+  router are merged into one node when there are many of them
+- Sortable, searchable host and flow tables, a details panel for every host and connection, and
+  PNG, JSON and CSV exports
 
 ## Installation
 
@@ -47,7 +50,7 @@ Python web application.
 1. **Start the application:**
    ```bash
    python app.py                              # serves http://127.0.0.1:5000
-   python app.py --capture-interface enp3s0   # also capture live traffic (off by default)
+   python app.py --capture-interface enp3s0   # also start capturing live traffic right away
    python app.py --capture-interface enp3s0 --capture-filter "not port 22"
    python app.py --debug                      # Flask debugger and auto-reload, local use only
    ```
@@ -55,12 +58,14 @@ Python web application.
 
 2. **Access the web interface:**
    - Open http://127.0.0.1:5000 in your browser
-   - Upload a PCAP or PCAPNG file; you're taken to its session when it has been analyzed
-   - Hover over hosts and connections for details, including every fingerprint result and its
-     confidence (1 is high, 5 is low, as in GRASSMARLIN)
+   - Upload a PCAP or PCAPNG file, or pick an interface and start a live capture
+   - Each opens a session page. Uploads are analyzed in the background and appear when ready
+   - Click a host or connection for details, including every fingerprint result and its
+     confidence (1 is high, 5 is low, as in GRASSMARLIN). The Hosts and Flows tabs list everything
 
 Live capture saves to its session every couple of seconds; use the Refresh button on its page to see
-new hosts. A capture still marked "capturing" when pyLot restarts is marked "stopped".
+new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is marked
+"stopped" or "failed" on the next start.
 
 ## Configuration
 
@@ -109,8 +114,9 @@ The database is automatically created on first run.
   (`ip link` lists them)
 - **Upload fails**: The error is shown on the upload page; details are in the server log
 - **400 Bad Request when browsing by hostname or IP**: Add that name to `PYLOT_TRUSTED_HOSTS`
-- **Very large captures**: Analysis runs at roughly 5,000 to 15,000 packets a second and the upload
-  waits for it. A graph with thousands of hosts is drawn as a grid and is slow to display
+- **Very large captures**: Analysis runs at roughly 5,000 to 15,000 packets a second in the
+  background, one upload at a time. When more than 200 hosts were reached through routers, the graph
+  merges them into one node per router; above 1,500 hosts it is drawn as a plain grid without labels
 
 ## Development
 
@@ -122,6 +128,7 @@ The application structure:
 - `parser/analysis.py`: hosts, flows and evidence for one capture
 - `capture/live_capture.py`: Real-time capture with dumpcap
 - `templates/`: HTML templates
+- `static/session.js`, `static/style.css`: the session page
 - `tests/`: pytest suite
 
 Run the tests with:

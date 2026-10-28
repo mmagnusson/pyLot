@@ -63,3 +63,7 @@ def test_unsupported_link_type_raises():
 def test_not_a_capture_raises():
     with pytest.raises(ValueError):
         list(read_capture(io.BufferedReader(io.BytesIO(b'this is not a pcap file at all'))))
+
+def test_truncated_header_raises_value_error():
+    with pytest.raises(ValueError, match='Not a readable capture'):
+        list(read_capture(reader(pcap_bytes([])[:10])))
