@@ -6,7 +6,7 @@ import pytest
 
 from packet_builder import (MAC_A, MAC_B, arp_frame, icmp_frame, ipv6_udp_frame, pcap_bytes, pcapng_bytes, reader,
                             tcp_frame, udp_frame)
-from parser.packets import TCP_FLAGS, read_capture
+from parser.packets import TCP_FLAGS, decode_frame, read_capture
 
 def decode(frames, writer=pcap_bytes):
     return list(read_capture(reader(writer(frames))))
@@ -67,3 +67,20 @@ def test_not_a_capture_raises():
 def test_truncated_header_raises_value_error():
     with pytest.raises(ValueError, match='Not a readable capture'):
         list(read_capture(reader(pcap_bytes([])[:10])))
+
+def test_truncated_tcp_option_is_ignored():
+    # An option kind with no room for its length byte: dpkt returns None for it
+    pkt = decode_frame(1, 0.0, tcp_frame('10.0.0.1', '10.0.0.2', 1234, 80, opts=b'\x02\x04\x05\xb4\x01\x01\x01\x08'), 1)
+    assert pkt.mss == 1460 and pkt.dst_port == 80
+
+def test_unexpected_decoding_errors_skip_only_that_frame(monkeypatch, caplog):
+    import parser.packets as packets
+    real = packets.decode_frame
+    def flaky(frame, ts, buf, linktype):
+        if frame == 2:
+            raise TypeError('decoder bug')
+        return real(frame, ts, buf, linktype)
+    monkeypatch.setattr(packets, 'decode_frame', flaky)
+    frames = [tcp_frame('10.0.0.1', '10.0.0.2', 1234, 80)] * 3
+    assert [p.frame for p in packets.read_capture(reader(pcap_bytes(frames)))] == [1, 3]
+    assert 'Unexpected error decoding frame 2' in caplog.text

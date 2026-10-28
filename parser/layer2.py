@@ -26,6 +26,7 @@ CDP_CAPABILITIES = ['Router', 'Transparent bridge', 'Source-route bridge', 'Swit
                     'VoIP phone', 'Remotely managed', 'CVTA', 'Two-port MAC relay']
 INFRASTRUCTURE = {'Bridge', 'Router', 'WLAN AP', 'Repeater', 'Switch', 'Transparent bridge', 'Source-route bridge',
                   'C-VLAN', 'S-VLAN', 'TPMR'}
+DCP_HELLO = 0x06  # service IDs: 3 Get, 4 Set, 5 Identify, 6 Hello
 PROFINET_ROLES = {0x01: 'IO-Device', 0x02: 'IO-Controller', 0x04: 'IO-Multidevice', 0x08: 'PN-Supervisor'}
 
 def ethertype_name(ethertype):
@@ -120,6 +121,14 @@ def _decode_llc(payload, dst_mac):
         except (IndexError, struct.error):
             pass
         return 'STP', properties
+    if payload[:3] == b'\xaa\xaa\x03' and payload[3:8] == b'\x00\x00\x0c\x01\x0b':
+        # Cisco's per-VLAN spanning tree: an ordinary BPDU after a SNAP header
+        properties = []
+        try:
+            _stp(payload[8:], properties)
+        except (IndexError, struct.error):
+            pass
+        return 'PVST+', properties
     if payload[:3] == b'\xaa\xaa\x03' and payload[3:6] == b'\x00\x00\x0c':
         return 'Cisco SNAP', []
     return 'LLC', []
@@ -204,20 +213,26 @@ def _profinet(payload, properties):
     frame_id, = struct.unpack_from('>H', payload, 0)
     properties.append(('ICSProtocol', 'PROFINET', 1 if frame_id >= 0xFEFC else 3))
     if frame_id == 0xFEFE:
-        # Identify request: sent by IO controllers and engineering tools looking for devices
-        properties.append(('Role', 'MASTER', 3))
+        # An Identify request for all devices comes from a controller or engineering tool scanning the network.
+        # One filtered on a name says nothing about the sender: devices look for their own name at startup
+        # to catch duplicates, and controllers look up their devices by name.
+        if payload[12:14] == b'\xff\xff':
+            properties.append(('Role', 'MASTER', 3))
         return
     if not 0xFEFC <= frame_id <= 0xFEFF:
         return
     service_id, service_type = payload[2], payload[3]
-    if service_type & 0x01 == 0:  # requests describe nothing about the sender; responses describe the device
+    response = service_type & 0x01 == 1
+    # Responses and Hello announcements describe the sender. Other requests don't: the name in an Identify
+    # request is the device being looked for, and a Set request's address is for the device being set.
+    if not response and service_id != DCP_HELLO:
         return
     data_length, = struct.unpack_from('>H', payload, 10)
     offset, end = 12, min(12 + data_length, len(payload))
     while offset + 4 <= end:
         option, suboption = payload[offset], payload[offset + 1]
         length, = struct.unpack_from('>H', payload, offset + 2)
-        block = payload[offset + 6:offset + 4 + length]  # after the 2-byte BlockInfo responses carry
+        block = payload[offset + 6:offset + 4 + length]  # after the 2-byte BlockInfo responses and Hellos carry
         offset += 4 + length + (length & 1)
         if (option, suboption) == (2, 1):
             properties.append(('TypeOfStation', _text(block), 1))

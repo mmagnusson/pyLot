@@ -155,9 +155,23 @@ def test_physical_view_without_imports(conn):
     nodes = {n['id']: n for n in graph['nodes']}
     assert nodes[f'mac:{PLC_MAC}']['parent'] == 'vlan:5' and nodes['vlan:5']['label'] == 'VLAN 5, port unknown'
     assert nodes[f'mac:{MAC_A}']['parent'] == 'vlan:unknown'
-    assert nodes[f'mac:{SWITCH_MAC}']['label'].startswith('sw-9')
+    # The announcing switch is a switch with its port, not a loose device
+    assert f'mac:{SWITCH_MAC}' not in nodes
+    switch = nodes['announced:sw-9']
+    assert switch['type'] == 'announced' and switch['macs'] == [SWITCH_MAC] and switch['addresses'] == ['10.0.0.251']
+    port = nodes['aport:sw-9:GigabitEthernet0/3']
+    assert port['parent'] == 'announced:sw-9' and port['type'] == 'port'
     capture = [e for e in graph['edges'] if e['source'] == 'capture']
-    assert capture == [{'source': 'capture', 'target': f'mac:{SWITCH_MAC}', 'type': 'capture', 'label': 'GigabitEthernet0/3'}]
+    assert capture == [{'source': 'capture', 'target': 'aport:sw-9:GigabitEthernet0/3', 'type': 'capture', 'label': ''}]
+
+def test_switch_announcing_from_several_port_macs_is_one_switch(conn):
+    session_id = session_with(conn, [], [cdp_frame('64:ae:0c:34:ab:97', 'SW-SR-CORE', 'GigabitEthernet3/0/23'),
+                                         cdp_frame('64:ae:0c:34:ab:98', 'SW-SR-CORE.plant.local', 'GigabitEthernet3/0/24')])
+    graph = storage.physical_graph(conn, session_id)
+    switches = [n for n in graph['nodes'] if n['type'] == 'announced']
+    assert len(switches) == 1 and sorted(switches[0]['macs']) == ['64:ae:0c:34:ab:97', '64:ae:0c:34:ab:98']
+    assert sorted(e['target'] for e in graph['edges'] if e['source'] == 'capture') == [
+        'aport:sw-sr-core:GigabitEthernet3/0/23', 'aport:sw-sr-core:GigabitEthernet3/0/24']
 
 # --- comparing sessions
 

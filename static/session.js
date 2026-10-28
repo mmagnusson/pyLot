@@ -57,6 +57,8 @@
         setText('status', session.status);
         setText('packet-count', fmt(session.packet_count));
         document.getElementById('stop-form').classList.toggle('hidden', session.status !== 'capturing');
+        const reanalyze = document.getElementById('reanalyze-form');
+        if (reanalyze) reanalyze.classList.toggle('hidden', !['ready', 'failed'].includes(session.status));
         document.getElementById('refresh').classList.toggle('hidden', session.status !== 'capturing');
         if (session.status === 'processing') {
             notice('Analyzing this capture. The results appear here when it finishes.');
@@ -439,7 +441,7 @@
 
     // --- physical view
 
-    const PHYSICAL_COLORS = { switch: '#34495e', neighbor: '#7f8c8d', port: '#aab7c4', capture: '#e8743b' };
+    const PHYSICAL_COLORS = { switch: '#34495e', announced: '#34495e', neighbor: '#7f8c8d', port: '#aab7c4', capture: '#e8743b' };
     let physicalCy = null;
     let physicalLoaded = false;
 
@@ -501,6 +503,10 @@
                                                 'padding': 14, 'color': '#555' } },
                 { selector: 'node[kind = "switch"]:parent', style: { 'background-color': '#dfe6ee', 'border-color': '#34495e',
                                                                      'border-width': 2, 'font-weight': 'bold', 'color': '#222' } },
+                { selector: 'node[kind = "announced"]', style: { 'shape': 'round-rectangle', 'width': 60, 'height': 30 } },
+                { selector: 'node[kind = "announced"]:parent', style: { 'background-color': '#dfe6ee', 'border-color': '#34495e',
+                                                                        'border-width': 2, 'border-style': 'dashed',
+                                                                        'font-weight': 'bold', 'color': '#222' } },
                 { selector: 'edge', style: { 'width': 1, 'line-color': '#aaa', 'curve-style': 'bezier', 'label': 'data(label)',
                                              'font-size': 8, 'color': '#555', 'text-rotation': 'autorotate' } },
                 { selector: 'edge[kind = "link"]', style: { 'width': 4, 'line-color': '#34495e' } },
@@ -516,6 +522,7 @@
             if (node.type === 'device') showDevicePanel(node.mac);
             else if (node.type === 'port') showPortPanel(node);
             else if (node.type === 'switch') showSwitchPanel(node, data.switches);
+            else if (node.type === 'announced') showAnnouncedPanel(node);
             else if (node.type === 'neighbor') {
                 openPanel(node.label, facts([['Platform', node.platform], ['Address', node.address]]),
                     el('p', { class: 'hint', text: 'A CDP or LLDP neighbor of an imported switch. Import its own output to see what is plugged into it.' }));
@@ -541,7 +548,19 @@
 
     function showPortPanel(port) {
         openPanel(`${port.switch} ${port.port}`, facts([['Description', port.description], ['Mode', port.mode],
-            [port.mode === 'trunk' ? 'Native VLAN' : 'VLAN', port.vlan], ['Shut down', port.shutdown ? 'yes' : null]]));
+            [port.mode === 'trunk' ? 'Native VLAN' : 'VLAN', port.vlan], ['Shut down', port.shutdown ? 'yes' : null]]),
+            port.announced ? el('p', { class: 'hint', text: 'Announced over LLDP or CDP to the capture point, so the capture is plugged into this port.' }) : null);
+    }
+
+    function showAnnouncedPanel(node) {
+        openPanel(node.label,
+            facts([['Vendor', node.vendor], ['Platform', node.platform], ['Description', node.description],
+                   ['Capabilities', node.capabilities], ['Management address', node.addresses.join(', ')]]),
+            el('p', { class: 'hint', text: 'This switch announced itself in the capture over LLDP or CDP, from the MAC addresses below. '
+                + 'Only the ports it announced are drawn; import its switch data to see what is plugged into the rest.' }),
+            el('h3', { text: 'MAC addresses' }),
+            el('p', {}, ...node.macs.flatMap((mac, i) => [i ? ', ' : null,
+                el('a', { href: '#', text: mac, onclick: event => { event.preventDefault(); showDevicePanel(mac); } })])));
     }
 
     function showSwitchPanel(node, switches) {

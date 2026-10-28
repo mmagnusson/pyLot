@@ -17,7 +17,7 @@ Python web application.
   hosts behind a router are merged into one node when there are many of them
 - Named networks: give address ranges names on the Networks page, or by clicking a network in the
   graph, and every session groups its hosts by them
-- Layer-2 devices: LLDP, CDP and STP from network gear, and the industrial protocols that run without IP
+- Layer-2 devices: LLDP, CDP, STP and Cisco PVST+ from network gear, and the industrial protocols that run without IP
   (PROFINET DCP and RT, IEC 61850 GOOSE and Sampled Values, EtherCAT, POWERLINK, MRP) identify and
   classify devices, including ones that never send IP traffic
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
@@ -75,6 +75,10 @@ Python web application.
    - The Logical tab is the IP network graph and the Physical tab the switch-level view. Hosts lists
      every IP address, Devices every MAC address (including devices that never sent IP traffic) and
      Flows every conversation
+
+   Uploaded files are kept, so a session can be analyzed again with Re-analyze on its page, or every
+   upload at once with "Re-analyze all uploads" on the sessions list. Do this after updating pyLot or
+   its fingerprints; imported switch data is kept.
 
    Live capture saves to its session every couple of seconds; use the Refresh button on its page to
    see new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is
@@ -162,11 +166,15 @@ The database is automatically created on first run.
 - **Live capture fails**: The session shows dumpcap's error. Usually you need to be in the
   wireshark group (log out and back in after adding yourself) or the interface name is wrong
   (`ip link` lists them)
+- **A session shows out-of-date results** (after updating pyLot or its fingerprints): use Re-analyze.
+  Live captures aren't saved to a file, so they can't be re-analyzed
 - **Upload fails**: The error is shown on the upload page; details are in the server log. For Zeek,
   upload `conn.log` itself, not another log or a directory archive
 - **400 Bad Request when browsing by hostname or IP**: Add that name to `PYLOT_TRUSTED_HOSTS`
 - **Very large captures**: Analysis runs at roughly 5,000 to 15,000 packets a second in the
-  background, one upload at a time. When more than 200 hosts were reached through routers, the graph
+  background, one upload at a time; a 2.3-million-packet capture takes about three minutes. Captures
+  full of scans can hold millions of flows, which makes the graph and baseline comparisons take
+  several seconds. When more than 200 hosts were reached through routers, the graph
   merges them into one node per router; above 1,500 hosts it is drawn as a plain grid without labels
 
 ## Development

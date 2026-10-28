@@ -260,3 +260,53 @@ def test_upload_zeek_conn_log(client):
     response = upload(client, data=b'{"not": "zeek"}\n', name='x.json')
     assert response.status_code == 400 and b'id.orig_h' in response.data
     assert upload(client, data=b'plain text', name='x.txt').status_code == 400
+
+def test_reanalyze_session(client, monkeypatch):
+    upload(client)
+    client.post('/api/sessions/1/switches', data={'config_text': SWITCH_TEXT})
+    with storage.connect(app_module.DB_PATH) as conn:
+        conn.execute("UPDATE hosts SET vendor = 'Truncated Co.' WHERE session_id = 1")
+    assert client.post('/sessions/1/reanalyze').headers['Location'] == '/sessions/1'
+    hosts = client.get('/api/sessions/1/hosts').get_json()['hosts']
+    assert hosts and 'Truncated Co.' not in {h['vendor'] for h in hosts}
+    assert client.get('/api/sessions/1').get_json()['status'] == 'ready'
+    assert len(client.get('/api/sessions/1/physical').get_json()['switches']) == 1  # imports survive
+    assert len(uploaded_files(client)) == 1
+
+def test_failed_reanalysis_keeps_the_file(client, monkeypatch):
+    upload(client)
+    working = app_module.parse_file
+    def explode(path):
+        raise RuntimeError('decoder bug')
+    monkeypatch.setattr(app_module, 'parse_file', explode)
+    client.post('/sessions/1/reanalyze')
+    session = client.get('/api/sessions/1').get_json()
+    assert session['status'] == 'failed' and 'decoder bug' in session['error'] and session['capture_file']
+    assert len(uploaded_files(client)) == 1
+    monkeypatch.setattr(app_module, 'parse_file', working)
+    client.post('/sessions/1/reanalyze')
+    assert client.get('/api/sessions/1').get_json()['status'] == 'ready'
+
+def test_reanalyze_refusals(client, monkeypatch):
+    with storage.connect(app_module.DB_PATH) as conn:
+        live = storage.create_session(conn, 'Live capture on eth0', 'live', 'stopped')
+    assert client.post(f'/sessions/{live}/reanalyze').status_code == 409
+    queued = []
+    monkeypatch.setattr(app_module, 'submit', lambda fn, *args: queued.append(args))
+    upload(client)
+    assert client.post('/sessions/2/reanalyze').status_code == 409  # still processing
+    os.remove(os.path.join(app_module.app.config['UPLOAD_FOLDER'], uploaded_files(client)[0]))
+    with storage.connect(app_module.DB_PATH) as conn:
+        storage.update_session(conn, 2, status='ready')
+    assert client.post('/sessions/2/reanalyze').status_code == 409  # file gone
+    assert client.post('/sessions/99/reanalyze').status_code == 404
+
+def test_reanalyze_all(client, monkeypatch):
+    upload(client)
+    upload(client)
+    queued = []
+    monkeypatch.setattr(app_module, 'submit', lambda fn, *args: queued.append(args))
+    assert client.post('/sessions/reanalyze').status_code == 302
+    assert [args[0] for args in queued] == [1, 2] and all(args[2] is False for args in queued)
+    assert {s['status'] for s in (client.get(f'/api/sessions/{i}').get_json() for i in (1, 2))} == {'processing'}
+    assert 'Re-analyze all uploads' in client.get('/').get_data(as_text=True)

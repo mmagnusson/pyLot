@@ -28,6 +28,13 @@
                   class="{{ '' if session.status == 'capturing' else 'hidden' }}">
                 <button type="submit" class="btn danger">Stop capture</button>
             </form>
+            {% if session.source == 'upload' and session.capture_file %}
+            <form id="reanalyze-form" method="post" action="{{ url_for('reanalyze_session', session_id=session.id) }}"
+                  class="{{ '' if session.status in ('ready', 'failed') else 'hidden' }}"
+                  onsubmit="return confirm('Analyze this file again with the current fingerprints and decoders? Imported switch data is kept.')">
+                <button type="submit" class="btn secondary" title="Analyze the uploaded file again with the current fingerprints and decoders">Re-analyze</button>
+            </form>
+            {% endif %}
         </div>
         <div class="legend" id="legend"></div>
         <div id="notice" class="notice hidden"></div>

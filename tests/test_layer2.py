@@ -1,5 +1,5 @@
 from parser.packets import decode_frame
-from packet_builder import (MAC_A, cdp_frame, dcp_identify_request, dcp_identify_response, goose_frame, lldp_frame,
+from packet_builder import (MAC_A, cdp_frame, dcp_hello, dcp_identify_request_for, dcp_set_ip_request, pvst_frame, dcp_identify_request, dcp_identify_response, goose_frame, lldp_frame,
                                   profinet_rt_frame, stp_frame)
 
 SWITCH_MAC = '00:1b:54:aa:bb:01'
@@ -63,3 +63,22 @@ def test_truncated_frames_still_get_a_protocol():
 def test_unknown_ethertype():
     from packet_builder import ethernet
     assert decode(ethernet('ff:ff:ff:ff:ff:ff', MAC_A, 0x9999, b'\x00' * 30)).l2_protocol == 'EtherType 0x9999'
+
+def test_profinet_hello_describes_the_sender():
+    pkt = decode(dcp_hello(PLC_MAC, 'io-device-7', role=0x01))
+    assert pkt.l2_protocol == 'PROFINET DCP'
+    assert props(pkt)['NameOfStation'] == 'io-device-7' and props(pkt)['IPAddress'] == '10.0.0.21'
+    assert props(pkt)['Role'] == 'SLAVE'
+
+def test_profinet_identify_request_for_a_name_says_nothing_about_the_sender():
+    pkt = decode(dcp_identify_request_for(PLC_MAC, 'switch3'))
+    assert props(pkt) == {'ICSProtocol': 'PROFINET'}
+
+def test_profinet_set_request_address_is_not_the_senders():
+    pkt = decode(dcp_set_ip_request(PLC_MAC))
+    assert pkt.l2_protocol == 'PROFINET DCP' and 'IPAddress' not in props(pkt)
+
+def test_pvst():
+    pkt = decode(pvst_frame(SWITCH_MAC, '00:1b:54:00:00:01', SWITCH_MAC))
+    assert pkt.l2_protocol == 'PVST+'
+    assert props(pkt)['RootBridgeID'] == '32768.00:1b:54:00:00:01' and props(pkt)['Category'] == 'NETWORK_DEVICE'

@@ -54,13 +54,21 @@ def read_capture(stream: BinaryIO) -> Iterator[Packet]:
     Raises ValueError for unsupported link types; frames that fail to decode are logged and skipped.
     """
     reader, linktype = _open(stream)
-    skipped = 0
+    skipped = unexpected = 0
     for frame, (ts, buf) in enumerate(reader, start=1):
         try:
-            yield decode_frame(frame, ts, buf, linktype)
+            pkt = decode_frame(frame, ts, buf, linktype)
         except (dpkt.Error, struct.error, ValueError, IndexError):
             skipped += 1
             logger.debug("Could not decode frame %d", frame, exc_info=True)
+            continue
+        except Exception:
+            # A decoding bug: skip the frame rather than lose the whole capture, but say so
+            skipped += 1
+            unexpected += 1
+            logger.warning("Unexpected error decoding frame %d", frame, exc_info=unexpected == 1)  # one traceback is enough
+            continue
+        yield pkt
     if skipped:
         logger.warning("Skipped %d frames that could not be decoded", skipped)
 
@@ -137,7 +145,8 @@ def decode_frame(frame: int, ts: float, buf: bytes, linktype: int) -> Packet:
     if isinstance(l4, dpkt.tcp.TCP):
         pkt.src_port, pkt.dst_port = l4.sport, l4.dport
         pkt.tcp_flags, pkt.seq, pkt.ack, pkt.window = l4.flags, l4.seq, l4.ack, l4.win  # flags include NS
-        for option, value in dpkt.tcp.parse_opts(l4.opts):
+        # dpkt marks an option cut off at the end of the header with None
+        for option, value in filter(None, dpkt.tcp.parse_opts(l4.opts)):
             if option == dpkt.tcp.TCP_OPT_MSS and len(value) == 2:
                 pkt.mss = struct.unpack('>H', value)[0]
         pkt.payload = bytes(l4.data)

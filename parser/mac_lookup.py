@@ -25,7 +25,8 @@ def load_oui_database(filename: str = DEFAULT_OUI_PATH) -> int:
                 if len(row) >= 2:
                     prefix = row[0].strip().upper().replace(':', '').replace('-', '')
                     if len(prefix) >= 6:
-                        oui_map[prefix[:6]] = ','.join(row[1:]).strip()  # vendor names can contain unquoted commas
+                        # Vendor names can contain unquoted commas, and a few end with a stray one
+                        oui_map[prefix[:6]] = ','.join(row[1:]).strip().rstrip(',').strip()
     except OSError as e:
         logger.warning("OUI database not loaded, vendor lookup disabled: %s", e)
         return 0

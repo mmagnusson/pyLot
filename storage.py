@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS flows (
     last_seen REAL NOT NULL,
     PRIMARY KEY (session_id, src, dst, transport, src_port, dst_port)
 );
+CREATE INDEX IF NOT EXISTS flows_by_packets ON flows (session_id, packets);  -- the flow table's default order
 CREATE TABLE IF NOT EXISTS mac_addresses (
     session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
     mac TEXT NOT NULL,
@@ -230,6 +231,27 @@ def get_session(conn, session_id):
     row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
     return dict(row) if row else None
 
+ANALYSIS_TABLES = ('hosts', 'flows', 'mac_addresses', 'arp_bindings', 'evidence', 'l2_flows', 'mac_evidence', 'mac_vlans')
+
+def reset_analysis(conn, session_id):
+    """
+    Clear what an upload session's analysis produced and mark it 'processing', so its file can be analyzed
+    again; imported switch data is kept. Returns False, changing nothing, if the session isn't a finished
+    upload that still has its file.
+    """
+    with conn:
+        claimed = conn.execute("UPDATE sessions SET status = 'processing', error = NULL, packet_count = 0, first_seen = NULL, "
+                               "last_seen = NULL WHERE id = ? AND source = 'upload' AND capture_file IS NOT NULL "
+                               "AND status IN ('ready', 'failed')", (session_id,)).rowcount
+        if claimed:
+            for table in ANALYSIS_TABLES:
+                conn.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
+    return bool(claimed)
+
+def reanalyzable_sessions(conn):
+    return [row['id'] for row in conn.execute("SELECT id FROM sessions WHERE source = 'upload' AND capture_file IS NOT NULL "
+                                              "AND status IN ('ready', 'failed') ORDER BY id")]
+
 def delete_session(conn, session_id):
     with conn:
         conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
@@ -405,14 +427,11 @@ def session_graph(conn, session_id, collapse_external=None, baseline_id=None):
     unless they are in a named network. With baseline_id, nodes and edges are marked with what is new
     or changed since that session.
     """
-    diff = compare_sessions(conn, session_id, baseline_id, limit=None) if baseline_id else None
+    diff = compare_sessions(conn, session_id, baseline_id, limit=None, conversation_limit=0) if baseline_id else None
     new_ips = {h['ip'] for h in diff['new_hosts']['items']} if diff else set()
     changed = {c['ip']: c['changes'] for c in diff['changed_hosts']['items']} if diff else {}
-    new_keys = {(c['client'], c['server'], c['transport'], c['port']) for c in diff['new_conversations']['items']} if diff else set()
     # Directions that carried a new conversation; an edge is new only if its own flows were
-    new_pairs = {(row['src'], row['dst']) for row in conn.execute(
-        "SELECT src, dst, transport, src_port, dst_port FROM flows WHERE session_id = ?", (session_id,))
-        if _conversation(row) in new_keys} if new_keys else set()
+    new_pairs = _new_flow_directions(conn, session_id) if diff and diff['new_conversations']['total'] else set()
     hosts = all_hosts(conn, session_id)
     network_map = NetworkMap.load(conn)
     placed = [(host, network_map.group_of(host)) for host in hosts]
@@ -717,12 +736,15 @@ def physical_graph(conn, session_id):
         nodes.append({'id': f'switch:{switch_id}', 'type': 'switch', 'label': switch['name'], 'switch_id': switch_id,
                       'ports': len(switch['ports']), 'macs': len(switch['macs'])})
 
-    # Network gear that announced itself in the capture is drawn as the imported switch of the same name, if any
-    announced = {}
+    # Network gear that announced itself over LLDP or CDP is drawn as the imported switch of the same name, or
+    # else as a switch of its own, with the ports it announced. Switches often announce from one MAC per port.
+    announced, announced_only = {}, defaultdict(list)
     for device in devices:
-        name = device['name'] if device['layer2'] else None
+        name = device['name'] if {'LLDP', 'CDP'} & set(device['layer2']) else None
         if name and _short_name(name) in by_name:
             announced[device['mac']] = by_name[_short_name(name)]['id']
+        elif name:
+            announced_only[_short_name(name)].append(device)
 
     remote = {}  # neighbor switches that weren't imported
     for switch_id, switch in switches.items():
@@ -743,10 +765,28 @@ def physical_graph(conn, session_id):
             edges.append({'source': source, 'target': target, 'type': 'link',
                           'label': neighbor['remote_port'] if other is None and neighbor['remote_port'] else ''})
 
-    vlan_groups = set()
     capture_links = []
+    for short, members in sorted(announced_only.items()):
+        switch_node = f'announced:{short}'
+        values = lambda name: sorted({v for d in members for v in d['properties'].get(name, {}).get('values', [])})
+        nodes.append({'id': switch_node, 'type': 'announced', 'label': members[0]['name'], 'macs': [d['mac'] for d in members],
+                      'vendor': members[0]['vendor'], 'platform': ', '.join(values('Platform')) or None,
+                      'description': ', '.join(values('SystemDescription')) or None,
+                      'addresses': values('ManagementAddress'), 'capabilities': ', '.join(values('Capabilities')) or None})
+        for device in members:
+            descriptions = device['properties'].get('PortDescription', {}).get('values', [])
+            for port in device['properties'].get('PortID', {}).get('values', []):
+                port_id = f'aport:{short}:{port}'
+                if not any(n['id'] == port_id for n in nodes):
+                    nodes.append({'id': port_id, 'type': 'port', 'label': port, 'parent': switch_node, 'switch': members[0]['name'],
+                                  'port': port, 'description': ', '.join(descriptions) or None, 'mode': None, 'vlan': None,
+                                  'shutdown': False, 'announced': True})
+                    capture_links.append((port_id, None))
+    absorbed = set(announced) | {d['mac'] for members in announced_only.values() for d in members}
+
+    vlan_groups = set()
     for device in devices:
-        if device['mac'] in announced:
+        if device['mac'] in absorbed:
             continue
         node = {**device, 'id': f"mac:{device['mac']}", 'type': 'device', 'label': _device_label(device)}
         if device['switch_id'] is not None:
@@ -756,9 +796,6 @@ def physical_graph(conn, session_id):
             vlan_groups.add(group)
             node['parent'] = group
         nodes.append(node)
-        port_id = device['properties'].get('PortID')
-        if device['layer2'] and port_id and ({'LLDP', 'CDP'} & set(device['layer2'])):
-            capture_links.append((node['id'], port_id['values'][0]))
     for group in sorted(vlan_groups):
         label = 'Port unknown' if group == 'vlan:unknown' else f"VLAN {group[5:]}, port unknown"
         nodes.append({'id': group, 'type': 'group', 'label': label})
@@ -766,9 +803,8 @@ def physical_graph(conn, session_id):
     # The capture point: LLDP and CDP are link-local, so their senders are on the other end of the capture's cable
     for mac, switch_id in announced.items():
         device = next(d for d in devices if d['mac'] == mac)
-        port = device['properties'].get('PortID')
-        capture_links.append((port_node(switch_id, interface_name(port['values'][0]) or port['values'][0]) if port else f'switch:{switch_id}',
-                              None))
+        ports = device['properties'].get('PortID', {}).get('values', [])
+        capture_links += [(port_node(switch_id, interface_name(port) or port), None) for port in ports] or [(f'switch:{switch_id}', None)]
     if capture_links:
         nodes.append({'id': 'capture', 'type': 'capture', 'label': 'Capture point'})
         for target, port in capture_links:
@@ -782,36 +818,56 @@ def _device_label(device):
 
 # --- comparing a session with a baseline
 
-def _conversation(flow):
-    """(client, server, transport, service port) for a flow, the same whichever direction it went."""
-    src_port, dst_port = flow['src_port'], flow['dst_port']
-    if (flow['transport'], dst_port) in PORT_LABELS or ((flow['transport'], src_port) not in PORT_LABELS and dst_port <= src_port):
-        return flow['src'], flow['dst'], flow['transport'], dst_port
-    return flow['dst'], flow['src'], flow['transport'], src_port
+# A conversation is (client, server, transport, service port), the same whichever direction a flow went. The
+# service port is a well-known one if either end uses one (the destination's first), otherwise the lower port.
+# Worked out in SQL, since a scanned network can have millions of flows.
+_KNOWN_PORTS = ', '.join(str(transport * 65536 + port) for transport, port in sorted(PORT_LABELS))
+_CLIENT_TO_SERVER = (f"(transport * 65536 + dst_port IN ({_KNOWN_PORTS}) OR "
+                     f"(transport * 65536 + src_port NOT IN ({_KNOWN_PORTS}) AND dst_port <= src_port))")
+_CONVERSATION = ("CASE WHEN forward THEN src ELSE dst END AS client, CASE WHEN forward THEN dst ELSE src END AS server, "
+                 "transport, CASE WHEN forward THEN dst_port ELSE src_port END AS port")
 
-def _conversations(conn, session_id):
-    conversations = {}
-    for row in conn.execute("SELECT src, dst, transport, src_port, dst_port, packets, bytes, first_seen FROM flows WHERE session_id = ?",
-                            (session_id,)):
-        key = _conversation(row)
-        item = conversations.get(key)
-        if item is None:
-            conversations[key] = {'client': key[0], 'server': key[1], 'transport': key[2], 'port': key[3],
-                                  'protocol': protocol_label(key[2], 0, key[3]), 'packets': row['packets'], 'bytes': row['bytes'],
-                                  'first_seen': row['first_seen']}
-        else:
-            item['packets'] += row['packets']
-            item['bytes'] += row['bytes']
-            item['first_seen'] = min(item['first_seen'], row['first_seen'])
-    return conversations
+def _flows_with_direction(columns):
+    """A subquery of one session's flows with a 'forward' column: whether the flow went client to server."""
+    return f"(SELECT {columns}, transport, src_port, dst_port, {_CLIENT_TO_SERVER} AS forward FROM flows WHERE session_id = ?)"
+_SAME_CONVERSATION = "y.client = x.client AND y.server = x.server AND y.transport = x.transport AND y.port = x.port"
+
+def _conversation_diff(conn, session_id, baseline_id, limit):
+    """
+    New and missing conversations, busiest first, each as (up to limit items, total). Leaves the temporary
+    tables conversations_now and conversations_before on conn for _new_flow_directions.
+    """
+    for table, sid in (('conversations_now', session_id), ('conversations_before', baseline_id)):
+        conn.execute(f"DROP TABLE IF EXISTS temp.{table}")
+        conn.execute(f"CREATE TEMP TABLE {table} AS SELECT client, server, transport, port, SUM(packets) AS packets, "
+                     f"SUM(bytes) AS bytes, MIN(first_seen) AS first_seen FROM (SELECT {_CONVERSATION}, packets, bytes, first_seen "
+                     f"FROM {_flows_with_direction('src, dst, packets, bytes, first_seen')}) GROUP BY client, server, transport, port",
+                     (sid,))
+        conn.execute(f"CREATE UNIQUE INDEX temp.{table}_key ON {table} (client, server, transport, port)")
+
+    def only_in(table, other):
+        where = f"FROM {table} x WHERE NOT EXISTS (SELECT 1 FROM {other} y WHERE {_SAME_CONVERSATION})"
+        total = conn.execute(f"SELECT COUNT(*) {where}").fetchone()[0]
+        rows = conn.execute(f"SELECT client, server, transport, port, packets, bytes, first_seen {where} "
+                            f"ORDER BY packets DESC, client, server" + (" LIMIT ?" if limit is not None else ""),
+                            (limit,) if limit is not None else ())
+        return [{**dict(row), 'protocol': protocol_label(row['transport'], 0, row['port'])} for row in rows], total
+
+    return only_in('conversations_now', 'conversations_before'), only_in('conversations_before', 'conversations_now')
+
+def _new_flow_directions(conn, session_id):
+    """(src, dst) pairs whose flows include a conversation the baseline didn't have; after _conversation_diff."""
+    return {(row['src'], row['dst']) for row in conn.execute(
+        f"SELECT DISTINCT src, dst FROM (SELECT src, dst, {_CONVERSATION} FROM {_flows_with_direction('src, dst')}) x "
+        f"WHERE NOT EXISTS (SELECT 1 FROM conversations_before y WHERE {_SAME_CONVERSATION})", (session_id,))}
 
 COMPARED_PROPERTIES = ('Category', 'Role', 'ICSProtocol')
 
-def compare_sessions(conn, session_id, baseline_id, limit=500):
+def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limit=None):
     """
     What changed in session_id since baseline_id: new and missing hosts, MAC addresses and conversations,
-    hosts whose MAC or classification changed, and new layer-2 protocols. Lists are cut to limit items,
-    with totals.
+    hosts whose MAC or classification changed, and new layer-2 protocols. Lists are cut to limit items
+    (conversations to conversation_limit, if given), with totals; None means no limit.
     """
     def summary(host):
         return {k: host.get(k) for k in ('ip', 'mac', 'vendor', 'via_mac', 'category', 'role', 'first_seen')}
@@ -839,10 +895,8 @@ def compare_sessions(conn, session_id, baseline_id, limit=500):
         if changes:
             changed.append({'ip': ip, 'changes': changes})
 
-    conversations_now, conversations_before = _conversations(conn, session_id), _conversations(conn, baseline_id)
-    by_traffic = lambda items: sorted(items, key=lambda c: (-c['packets'], c['client'], c['server']))
-    new_conversations = by_traffic(conversations_now[k] for k in conversations_now.keys() - conversations_before.keys())
-    missing_conversations = by_traffic(conversations_before[k] for k in conversations_before.keys() - conversations_now.keys())
+    new_conversations, missing_conversations = _conversation_diff(
+        conn, session_id, baseline_id, limit if conversation_limit is None else conversation_limit)
 
     macs = lambda sid: {row['mac']: dict(row) for row in conn.execute(
         "SELECT mac, vendor, packets, first_seen FROM mac_addresses WHERE session_id = ?", (sid,))}
@@ -856,7 +910,8 @@ def compare_sessions(conn, session_id, baseline_id, limit=500):
         return {'items': items[:limit], 'total': len(items)}
 
     return {'new_hosts': cut(new_hosts), 'missing_hosts': cut(missing_hosts), 'changed_hosts': cut(changed),
-            'new_conversations': cut(new_conversations), 'missing_conversations': cut(missing_conversations),
+            'new_conversations': {'items': new_conversations[0], 'total': new_conversations[1]},
+            'missing_conversations': {'items': missing_conversations[0], 'total': missing_conversations[1]},
             'new_macs': cut(sorted((macs_now[m] for m in macs_now.keys() - macs_before.keys()), key=lambda m: m['mac'])),
             'missing_macs': cut(sorted((macs_before[m] for m in macs_before.keys() - macs_now.keys()), key=lambda m: m['mac'])),
             'new_layer2': cut(sorted((l2_now[k] for k in l2_now.keys() - l2_before.keys()), key=lambda r: (r['protocol'], r['src_mac'])))}

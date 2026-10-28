@@ -16,3 +16,6 @@ pylot.sqlite3-wal
 pylot.sqlite3-shm
 .pytest_cache/
 
+
+# Third-party ICS test captures, kept out of the repository
+ICS-DATA_DO-NOT-COMMIT/

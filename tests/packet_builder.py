@@ -115,12 +115,37 @@ def _dcp_block(option, suboption, value, response=True):
     data = (b'\x00\x00' if response else b'') + value
     return bytes([option, suboption]) + struct.pack('>H', len(data)) + data + (b'\x00' if len(data) % 2 else b'')
 
+def _dcp_blocks(name_of_station, role, vendor, device, ip, response=True):
+    return (_dcp_block(2, 1, b'S7-1500', response) + _dcp_block(2, 2, name_of_station.encode(), response)
+            + _dcp_block(2, 3, struct.pack('>HH', vendor, device), response) + _dcp_block(2, 4, bytes([role, 0]), response)
+            + _dcp_block(1, 2, socket.inet_aton(ip) + socket.inet_aton('255.255.255.0') + socket.inet_aton('0.0.0.0'), response))
+
 def dcp_identify_response(src_mac, name_of_station, role=0x01, vendor=0x002a, device=0x0313, ip='10.0.0.20'):
-    blocks = (_dcp_block(2, 1, b'S7-1500') + _dcp_block(2, 2, name_of_station.encode())
-              + _dcp_block(2, 3, struct.pack('>HH', vendor, device)) + _dcp_block(2, 4, bytes([role, 0]))
-              + _dcp_block(1, 2, socket.inet_aton(ip) + socket.inet_aton('255.255.255.0') + socket.inet_aton('0.0.0.0')))
+    blocks = _dcp_blocks(name_of_station, role, vendor, device, ip)
     payload = struct.pack('>HBBIHH', 0xFEFF, 0x05, 0x01, 0x1234, 0, len(blocks)) + blocks
     return ethernet('00:0e:8c:00:00:01', src_mac, 0x8892, payload)
+
+def dcp_hello(src_mac, name_of_station, role=0x01, vendor=0x002a, device=0x0313, ip='10.0.0.21'):
+    blocks = _dcp_blocks(name_of_station, role, vendor, device, ip)  # Hello blocks carry BlockInfo like responses
+    payload = struct.pack('>HBBIHH', 0xFEFC, 0x06, 0x00, 0x1234, 0, len(blocks)) + blocks
+    return ethernet('01:0e:cf:00:00:01', src_mac, 0x8892, payload)
+
+def dcp_identify_request_for(src_mac, name_of_station):
+    """An Identify request filtered on a name: the name is the device looked for, not the sender."""
+    block = _dcp_block(2, 2, name_of_station.encode(), response=False)
+    payload = struct.pack('>HBBIHH', 0xFEFE, 0x05, 0x00, 0x1234, 1, len(block)) + block
+    return ethernet('01:0e:cf:00:00:00', src_mac, 0x8892, payload)
+
+def dcp_set_ip_request(src_mac, ip='192.168.0.10'):
+    """A tool setting another device's address: the address is not the sender's."""
+    block = bytes([1, 2]) + struct.pack('>H', 14) + b'\x00\x01' + socket.inet_aton(ip) + socket.inet_aton('255.255.255.0') + b'\x00' * 4
+    payload = struct.pack('>HBBIHH', 0xFEFD, 0x04, 0x00, 0x1234, 0, len(block)) + block
+    return ethernet('08:00:06:93:cf:32', src_mac, 0x8892, payload)
+
+def pvst_frame(src_mac, root_mac, bridge_mac, priority=0x8000):
+    bpdu = (b'\x00\x00\x02\x02\x3c' + struct.pack('>H', priority) + mac_bytes(root_mac) + struct.pack('>I', 4)
+            + struct.pack('>H', priority + 10) + mac_bytes(bridge_mac) + b'\x80\x01' + b'\x00' * 8 + b'\x00')
+    return llc_frame('01:00:0c:cc:cc:cd', src_mac, b'\xaa\xaa\x03\x00\x00\x0c\x01\x0b' + bpdu)
 
 def dcp_identify_request(src_mac):
     payload = struct.pack('>HBBIHH', 0xFEFE, 0x05, 0x00, 0x1234, 1, 4) + b'\xff\xff\x00\x00'

@@ -145,6 +145,10 @@
         {% if sessions %}
         <div class="sessions">
             <h2>Sessions</h2>
+            <form method="post" action="{{ url_for('reanalyze_all') }}" style="margin-bottom: 10px"
+                  onsubmit="return confirm('Analyze every uploaded file again with the current fingerprints and decoders? This runs in the background, one file at a time.')">
+                <button type="submit" class="link-btn" style="color: #0074D9">Re-analyze all uploads</button>
+            </form>
             <table>
                 <tr><th>Name</th><th>Source</th><th>Status</th><th>Packets</th><th>Hosts</th><th>Created (UTC)</th><th></th><th></th></tr>
                 {% for s in sessions %}
@@ -157,6 +161,11 @@
                     <td>{{ s.created_at }}</td>
                     <td>{% if sessions|length > 1 %}<a href="{{ url_for('compare_view', session_id=s.id) }}">Compare</a>{% endif %}</td>
                     <td>
+                        {% if s.source == 'upload' and s.capture_file and s.status in ('ready', 'failed') %}
+                        <form method="post" action="{{ url_for('reanalyze_session', session_id=s.id) }}">
+                            <button type="submit" class="link-btn" style="color: #0074D9">Re-analyze</button>
+                        </form>
+                        {% endif %}
                         <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" onsubmit="return confirm('Delete this session and its capture file?')">
                             <button type="submit" class="link-btn">Delete</button>
                         </form>

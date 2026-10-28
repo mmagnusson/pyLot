@@ -98,8 +98,12 @@ def upload():
     submit(analyze_upload, session_id, filepath)
     return redirect(url_for('session_view', session_id=session_id))
 
-def analyze_upload(session_id, filepath):
-    """Background job: analyze an uploaded capture into its session, marking it ready or failed."""
+def analyze_upload(session_id, filepath, discard_on_failure=True):
+    """
+    Background job: analyze an uploaded capture into its session, marking it ready or failed. A new upload
+    that can't be analyzed is deleted; a re-analysis keeps its file (discard_on_failure=False), since it
+    was readable before.
+    """
     with db() as conn:
         try:
             analyzer = parse_file(filepath)
@@ -107,12 +111,45 @@ def analyze_upload(session_id, filepath):
             storage.update_session(conn, session_id, status='ready')
         except Exception as e:
             logger.exception("Failed to analyze %s", filepath)
+            if not discard_on_failure:
+                storage.update_session(conn, session_id, status='failed', error=f'Could not analyze this capture: {e}')
+                return
             storage.update_session(conn, session_id, status='failed', error=f'Could not analyze this capture: {e}',
                                    capture_file=None)
             try:
                 os.remove(filepath)
             except FileNotFoundError:
                 pass
+
+def _upload_path(session):
+    return os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(session['capture_file']))
+
+def _reanalyze(conn, session):
+    """Queue a session's upload for analysis again. False if it can't be (no file, or busy)."""
+    path = _upload_path(session) if session['capture_file'] else None
+    if path is None or not os.path.exists(path) or not storage.reset_analysis(conn, session['id']):
+        return False
+    submit(analyze_upload, session['id'], path, False)
+    return True
+
+@app.route('/sessions/<int:session_id>/reanalyze', methods=['POST'])
+def reanalyze_session(session_id):
+    with db() as conn:
+        session = _session_or_404(conn, session_id)
+        if not _reanalyze(conn, session):
+            if session['source'] != 'upload':
+                return index_error('Live captures are not saved to a file, so they cannot be analyzed again.', 409)
+            if session['status'] in ('processing', 'capturing'):
+                return index_error('That session is still being analyzed.', 409)
+            return index_error('The file for that session is no longer available, so it cannot be analyzed again.', 409)
+    return redirect(url_for('session_view', session_id=session_id))
+
+@app.route('/sessions/reanalyze', methods=['POST'])
+def reanalyze_all():
+    with db() as conn:
+        for session_id in storage.reanalyzable_sessions(conn):
+            _reanalyze(conn, storage.get_session(conn, session_id))
+    return redirect(url_for('index'))
 
 @app.route('/captures', methods=['POST'])
 def start_capture():
@@ -162,7 +199,7 @@ def delete_session(session_id):
         storage.delete_session(conn, session_id)
     if session['capture_file']:
         try:
-            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(session['capture_file'])))
+            os.remove(_upload_path(session))
         except FileNotFoundError:
             pass
     return redirect(url_for('index'))
