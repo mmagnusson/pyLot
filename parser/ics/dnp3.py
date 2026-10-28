@@ -13,9 +13,9 @@ FUNCTIONS = {
     14: ('Warm Restart', 'control'), 15: ('Initialize Data', 'control'), 16: ('Initialize Application', 'control'),
     17: ('Start Application', 'control'), 18: ('Stop Application', 'control'), 19: ('Save Configuration', 'program'),
     20: ('Enable Unsolicited Responses', 'write'), 21: ('Disable Unsolicited Responses', 'write'), 22: ('Assign Class', 'write'),
-    23: ('Delay Measurement', 'diagnostic'), 24: ('Record Current Time', 'write'), 25: ('Open File', 'program'),
-    26: ('Close File', 'program'), 27: ('Delete File', 'program'), 28: ('Get File Info', 'read'),
-    29: ('Authenticate File', 'program'), 30: ('Abort File', 'program'), 31: ('Activate Configuration', 'program'),
+    23: ('Delay Measurement', 'diagnostic'), 24: ('Record Current Time', 'write'), 25: ('Open File', 'other'),
+    26: ('Close File', 'other'), 27: ('Delete File', 'program'), 28: ('Get File Info', 'read'),
+    29: ('Authenticate File', 'session'), 30: ('Abort File', 'other'), 31: ('Activate Configuration', 'program'),
     32: ('Authentication Request', 'session'), 33: ('Authentication Error', 'session'),
 }
 RESPONSE, UNSOLICITED_RESPONSE = 129, 130

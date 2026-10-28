@@ -76,7 +76,82 @@
         if (!graphLoaded) {
             graphLoaded = true;
             loadGraph();
+            loadAlerts();
         }
+    }
+
+    // --- alerts
+
+    let alertList = [];
+    const severityBadge = severity => el('span', { class: `severity severity-${severity}`, text: severity });
+    const hostLink = ip => el('a', { href: '#', text: ip, onclick: event => { event.preventDefault(); showHostPanel(ip); } });
+    const ALERT_COLUMNS = [
+        { key: 'severity', label: 'Severity', format: severityBadge }, { key: 'title', label: 'Alert' },
+        { key: 'src', label: 'Client', format: (v, a) => v || (a.clients ? `${a.clients.length} hosts` : '') },
+        { key: 'dst', label: 'Device', format: v => v || 'many' },
+        { key: 'protocols', label: 'Protocols', format: v => v.join(', ') },
+        { key: 'operations', label: 'Operations', format: v => v.slice(0, 3).join(', ') + (v.length > 3 ? ` and ${v.length - 3} more` : '') },
+        { key: 'count', label: 'Count', num: true, format: fmt }, { key: 'first_seen', label: 'First seen', format: when },
+        { key: 'first_frame', label: 'First frame', num: true }
+    ];
+
+    async function loadAlerts() {
+        let data;
+        try {
+            data = await getJSON(`${API}/alerts`);
+        } catch (error) {
+            document.getElementById('alerts-table').replaceChildren(el('div', { class: 'empty', text: `Could not load alerts: ${error.message}` }));
+            return;
+        }
+        alertList = data.alerts;
+        const box = document.getElementById('alert-box');
+        const total = alertList.length;
+        box.classList.toggle('hidden', !total);
+        box.classList.toggle('alert-high', data.counts.high > 0);
+        setText('alert-count', fmt(data.counts.high ? data.counts.high : total));
+        setText('alert-label', data.counts.high ? `high-severity alert${data.counts.high === 1 ? '' : 's'} (${fmt(total)} in all)`
+                                                : `alert${total === 1 ? '' : 's'}`);
+        renderAlerts();
+    }
+
+    function renderAlerts() {
+        const severity = document.getElementById('alerts-severity').value;
+        const query = document.getElementById('alerts-filter').value.trim().toLowerCase();
+        const shown = alertList.filter(a => (!severity || a.severity === severity) && (!query || [a.title, a.src, a.dst, ...(a.clients || []),
+            ...a.protocols, ...a.operations].filter(Boolean).join(' ').toLowerCase().includes(query)));
+        document.getElementById('alerts-table').replaceChildren(shown.length
+            ? table(ALERT_COLUMNS, shown, showAlertPanel)
+            : el('div', { class: 'empty', text: alertList.length ? 'Nothing matches.' : 'No risky activity found in this session.' }));
+    }
+
+    function showAlertPanel(alert) {
+        const clients = alert.src ? [alert.src] : (alert.clients || []);
+        openPanel(alert.title,
+            el('p', {}, severityBadge(alert.severity)),
+            el('p', { text: alert.description }),
+            facts([['Protocols', alert.protocols.join(', ')], ['Count', fmt(alert.count)], ['First seen', when(alert.first_seen)],
+                   ['Last seen', when(alert.last_seen)], ['First frame', alert.first_frame]]),
+            clients.length ? el('h3', { text: clients.length === 1 ? 'Client' : 'Clients' }) : null,
+            clients.length ? el('p', {}, ...clients.flatMap((ip, i) => [i ? ', ' : null, hostLink(ip)])) : null,
+            alert.dst ? el('h3', { text: 'Device' }) : null,
+            alert.dst ? el('p', {}, hostLink(alert.dst)) : null,
+            alert.operations.length ? el('h3', { text: 'Operations' }) : null,
+            alert.operations.length ? el('ul', {}, ...alert.operations.map(name => el('li', { text: name }))) : null,
+            alert.operations.length ? el('p', {}, el('a', { href: '#', text: 'Show them in the Operations tab', onclick: event => {
+                event.preventDefault();
+                closePanel();
+                operationsTable.setHost(alert.dst || alert.src);
+                showTab('operations');
+            } })) : null);
+    }
+
+    function alertsSection(alerts) {
+        if (!alerts || !alerts.length) return [];
+        return [el('h3', { text: `Alerts (${alerts.length})` }),
+                table([{ key: 'severity', label: 'Severity', format: severityBadge }, { key: 'title', label: 'Alert' },
+                       { key: 'src', label: 'Client', format: (v, a) => v || (a.clients ? `${a.clients.length} hosts` : '') },
+                       { key: 'dst', label: 'Device', format: v => v || 'many' }, { key: 'count', label: 'Count', num: true, format: fmt }],
+                      alerts, showAlertPanel)];
     }
 
     // --- graph
@@ -359,6 +434,7 @@
         const properties = Object.entries(host.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(ip,
             ...baselineChanges(ip),
+            ...alertsSection(host.alerts),
             ...identitySection(host),
             facts([['Network', host.network], ['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
                    ['Address type', host.kind === 'unicast' ? null : host.kind],
@@ -843,6 +919,7 @@
         if (name === 'flows' && !flowsTable.loaded) flowsTable.load();
         if (name === 'devices' && !devicesTable.loaded) devicesTable.load();
         if (name === 'operations' && !operationsTable.loaded) operationsTable.load();
+        if (name === 'alerts') renderAlerts();
         if (name === 'physical') {
             if (!physicalLoaded) loadPhysical();
             else if (physicalCy) physicalCy.resize();
@@ -851,6 +928,9 @@
 
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
     document.getElementById('flows-host-clear').addEventListener('click', () => { flowsTable.setHost(null); flowsTable.load(); });
+    document.getElementById('alerts-severity').addEventListener('change', renderAlerts);
+    document.getElementById('alerts-filter').addEventListener('input', renderAlerts);
+    document.getElementById('alert-box').addEventListener('click', event => { event.preventDefault(); showTab('alerts'); });
     document.getElementById('operations-host-clear').addEventListener('click', () => { operationsTable.setHost(null); operationsTable.load(); });
 
     let filterTimer = null;
@@ -866,6 +946,7 @@
         if (flowsTable.loaded) flowsTable.load();
         if (devicesTable.loaded) devicesTable.load();
         if (operationsTable.loaded) operationsTable.load();
+        loadAlerts();
         if (physicalLoaded) loadPhysical();
     });
     document.getElementById('collapse-toggle').addEventListener('click', async event => {

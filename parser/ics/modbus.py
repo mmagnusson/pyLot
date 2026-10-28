@@ -13,9 +13,9 @@ FUNCTIONS = {
     22: ('Mask Write Register', 'write'), 23: ('Read/Write Multiple Registers', 'write'), 24: ('Read FIFO Queue', 'read'),
     43: ('Encapsulated Interface Transport', 'other'), 90: ('UMAS', 'other'),
 }
-# Diagnostics sub-functions that change the server's state rather than report on it
+# Diagnostics sub-functions that change the server's state, or only its counters, rather than report on it
 DIAGNOSTICS = {1: ('Restart Communications Option', 'control'), 4: ('Force Listen Only Mode', 'control'),
-               10: ('Clear Counters and Diagnostic Register', 'control'), 20: ('Clear Overrun Counter and Flag', 'control')}
+               10: ('Clear Counters and Diagnostic Register', 'diagnostic'), 20: ('Clear Overrun Counter and Flag', 'diagnostic')}
 MEI_TYPES = {13: ('CANopen General Reference', 'other'), 14: ('Read Device Identification', 'diagnostic')}
 # Schneider Electric UMAS (Unity/EcoStruxure engineering protocol, carried in function 90)
 UMAS = {

@@ -35,7 +35,7 @@ AREAS = {0x03: 'System info', 0x05: 'System flags', 0x06: 'Analog inputs', 0x07:
 USERDATA_FUNCTIONS = {
     (1, 1): ('Request Diagnostic Data', 'diagnostic'), (1, 2): ('Variable Status', 'read'), (1, 8): ('Modify Variable', 'write'),
     (1, 13): ('Disable Job', 'diagnostic'), (1, 14): ('Enable Job', 'diagnostic'), (1, 15): ('Delete Job', 'diagnostic'),
-    (1, 16): ('Read Job List', 'diagnostic'), (1, 19): ('Block Status', 'diagnostic'), (1, 22): ('Flash LED', 'control'),
+    (1, 16): ('Read Job List', 'diagnostic'), (1, 19): ('Block Status', 'diagnostic'), (1, 22): ('Flash LED', 'diagnostic'),
     (2, 1): ('Cyclic Transfer', 'read'), (2, 4): ('Cyclic Transfer Unsubscribe', 'read'), (2, 5): ('Change Driven Transfer', 'read'),
     (2, 7): ('Change Driven Transfer Modify', 'read'), (2, 8): ('Read Data Record (RDREC)', 'read'),
     (3, 1): ('List Blocks', 'diagnostic'), (3, 2): ('List Blocks of Type', 'diagnostic'), (3, 3): ('Get Block Info', 'diagnostic'),

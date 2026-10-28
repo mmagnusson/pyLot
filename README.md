@@ -14,6 +14,9 @@ Python web application.
   Schneider UMAS), DNP3, S7comm, EtherNet/IP and CIP (including Logix tag services), IEC 60870-5-104,
   BACnet/IP and SNMP. Program downloads, PLC stop and start, control commands and writes are listed
   first and drawn in red or orange on the graph
+- Alerts for risky activity: controller programs changed or read out, controllers stopped or
+  restarted, control commands, writes, devices changed from several hosts, protocol fuzzing, device
+  enumeration and scans of industrial ports, each rated high, medium or low
 - Asset identity: vendor, model, order number, firmware and serial number from the identification
   replies devices send (Modbus Read Device Identification, EtherNet/IP List Identity and Identity
   object, S7 module and component identification, BACnet device properties), plus SNMP system
@@ -31,7 +34,7 @@ Python web application.
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
   see which device is plugged into which port, how switches connect, and where the capture was taken
 - Baseline comparison: new and missing hosts, MAC addresses and conversations, new industrial
-  operations, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
+  operations, new alerts, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
   and CSV exports
 
@@ -83,7 +86,8 @@ Python web application.
    - The Logical tab is the IP network graph and the Physical tab the switch-level view. Hosts lists
      every IP address, Devices every MAC address (including devices that never sent IP traffic) and
      Flows every conversation. Operations lists the industrial operations decoded from the traffic,
-     most consequential first, with a filter by kind (program, control, write, read and so on)
+     most consequential first, with a filter by kind (program, control, write, read and so on), and
+     Alerts the risky activity found in them; the alert count is shown at the top of the page
    - A host's panel starts with its identity, as the device reported it, when the capture includes
      an identification reply
 
@@ -135,6 +139,29 @@ Identity only appears when the capture includes a device answering an identifica
 example an engineering tool going online, an asset inventory scan, or EtherNet/IP and BACnet
 discovery broadcasts. A baseline comparison only reports a model or firmware change when both
 captures heard that device's identity.
+
+### Alerts
+
+| Severity | Alert | Raised when |
+|---|---|---|
+| High | Controller program changed | program blocks or files downloaded, deleted or activated |
+| High | Controller stopped, started or restarted | PLC stop or start, restarts, CIP reset, Modbus listen-only mode |
+| High | Protocol fuzzing or scanning | a client sends 5 or more function codes no standard defines |
+| Medium | Program read from a controller | a program or configuration upload |
+| Medium | Control commands | DNP3 operate, IEC 104 commands and other commands that move equipment |
+| Medium | Changed from several hosts | more than one host writes to, commands or programs the same device |
+| Medium | Devices asked to identify themselves | one host asks 5 or more devices for their model and firmware |
+| Medium | Many failed requests | 20 or more errors and exceptions between one client and one device |
+| Medium | Scan of industrial services | one host touches 10 or more industrial services with 3 packets or fewer each |
+| Medium | SNMP Set | a device's settings changed over SNMP |
+| Low | Writes to a device | values written to registers, tags, objects or memory |
+| Low | Clock set | a device's clock set |
+| Low | Password or authentication sent | a client authenticates to a device |
+
+Each alert covers one client and one device (or one client and many devices), however many times
+it happened, with the operations involved, a count and the first frame to look at in Wireshark.
+Some of these are routine for a SCADA master or an engineering workstation: compare with a baseline
+to see only the alerts that are new.
 
 ### Zeek logs
 
@@ -217,6 +244,7 @@ The database is automatically created on first run.
 The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
+- `alerts.py`: alert rules, worked out from a session's operations and flows when asked for
 - `parser/pcap_parser.py`: entry point that analyzes a capture or Zeek log
 - `parser/packets.py`: pcap/pcapng decoding (dpkt)
 - `parser/zeek.py`: Zeek conn.log reading

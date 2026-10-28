@@ -14,6 +14,7 @@ import logging
 import os
 import sqlite3
 import uuid
+import alerts
 import storage
 
 logger = logging.getLogger(__name__)
@@ -284,6 +285,14 @@ def session_operations(session_id):
         kinds = storage.operation_kinds(conn, session_id)
     return jsonify({'operations': operations, 'total': total, 'kinds': kinds})
 
+@app.route('/api/sessions/<int:session_id>/alerts')
+def session_alerts(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        found = alerts.session_alerts(conn, session_id)
+    counts = {severity: sum(1 for a in found if a['severity'] == severity) for severity in alerts.SEVERITIES}
+    return jsonify({'alerts': found, 'counts': counts})
+
 @app.route('/api/sessions/<int:session_id>/devices')
 def session_devices(session_id):
     with db() as conn:
@@ -445,6 +454,18 @@ def export_flows(session_id):
         _session_or_404(conn, session_id)
         flows, _ = storage.list_flows(conn, session_id)
     return _csv(flows, FLOW_CSV_COLUMNS, f'session_{session_id}_flows.csv')
+
+ALERT_CSV_COLUMNS = ['severity', 'title', 'src', 'dst', 'protocols', 'operations', 'count', 'first_seen', 'last_seen',
+                     'first_frame', 'rule']
+
+@app.route('/sessions/<int:session_id>/alerts.csv')
+def export_alerts(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        found = alerts.session_alerts(conn, session_id)
+    rows = [{**a, 'src': a['src'] or '; '.join(a.get('clients', [])), 'dst': a['dst'] or 'many',
+             'protocols': '; '.join(a['protocols']), 'operations': '; '.join(a['operations'])} for a in found]
+    return _csv(rows, ALERT_CSV_COLUMNS, f'session_{session_id}_alerts.csv')
 
 OPERATION_CSV_COLUMNS = ['src', 'dst', 'protocol', 'operation', 'kind', 'count', 'first_seen', 'last_seen', 'first_frame']
 

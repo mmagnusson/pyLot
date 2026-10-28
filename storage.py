@@ -3,6 +3,7 @@ import ipaddress
 import sqlite3
 from collections import Counter, defaultdict
 
+import alerts as alert_rules
 from parser.mac_lookup import lookup_manufacturer
 from parser.protocols import PORT_LABELS, label as protocol_label
 from parser.switch_config import interface_name
@@ -451,7 +452,8 @@ def session_graph(conn, session_id, collapse_external=None, baseline_id=None):
     unless they are in a named network. With baseline_id, nodes and edges are marked with what is new
     or changed since that session.
     """
-    diff = compare_sessions(conn, session_id, baseline_id, limit=None, conversation_limit=0) if baseline_id else None
+    diff = (compare_sessions(conn, session_id, baseline_id, limit=None, conversation_limit=0, include_alerts=False)
+            if baseline_id else None)
     new_ips = {h['ip'] for h in diff['new_hosts']['items']} if diff else set()
     changed = {c['ip']: c['changes'] for c in diff['changed_hosts']['items']} if diff else {}
     # Directions that carried a new conversation; an edge is new only if its own flows were
@@ -594,7 +596,12 @@ def host_detail(conn, session_id, ip, flow_limit=100):
                                                   "WHERE session_id = ? AND ip = ?", (session_id, ip))]
     host['flows'], host['flow_count'] = list_flows(conn, session_id, host=ip, limit=flow_limit)
     host['operations'], host['operation_count'] = list_operations(conn, session_id, host=ip, sort='kind', limit=flow_limit)
+    host['alerts'] = host_alerts(alert_rules.session_alerts(conn, session_id), ip)
     return host
+
+def host_alerts(alerts, ip):
+    """The alerts a host is involved in, as client, server or one of several controlling clients."""
+    return [a for a in alerts if ip in (a['src'], a['dst']) or ip in a.get('clients', ())]
 
 OPERATION_SORTS = {'src', 'dst', 'protocol', 'operation', 'kind', 'count', 'first_seen', 'last_seen'}
 # Most consequential first when sorting by kind
@@ -929,11 +936,12 @@ COMPARED_PROPERTIES = ('Category', 'Role', 'ICSProtocol')
 # What a device says it is: only a change when both sessions heard it, since not every capture asks
 COMPARED_IDENTITY = ('Vendor', 'Model', 'Product', 'OrderNumber', 'Firmware', 'Serial')
 
-def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limit=None):
+def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limit=None, include_alerts=True):
     """
     What changed in session_id since baseline_id: new and missing hosts, MAC addresses and conversations,
     hosts whose MAC, classification or reported identity (model, firmware...) changed, new layer-2
-    protocols, and industrial operations clients hadn't sent before. Lists are cut to limit items
+    protocols, industrial operations clients hadn't sent before, and alerts the baseline didn't have
+    (unless include_alerts is False). Lists are cut to limit items
     (conversations to conversation_limit, if given), with totals; None means no limit.
     """
     def summary(host):
@@ -987,7 +995,12 @@ def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limi
             'new_macs': cut(sorted((macs_now[m] for m in macs_now.keys() - macs_before.keys()), key=lambda m: m['mac'])),
             'missing_macs': cut(sorted((macs_before[m] for m in macs_before.keys() - macs_now.keys()), key=lambda m: m['mac'])),
             'new_layer2': cut(sorted((l2_now[k] for k in l2_now.keys() - l2_before.keys()), key=lambda r: (r['protocol'], r['src_mac']))),
-            'new_operations': cut(_new_operations(conn, session_id, baseline_id))}
+            'new_operations': cut(_new_operations(conn, session_id, baseline_id)),
+            'new_alerts': cut(_new_alerts(conn, session_id, baseline_id) if include_alerts else [])}
+
+def _new_alerts(conn, session_id, baseline_id):
+    before = {(a['rule'], a['src'], a['dst']) for a in alert_rules.session_alerts(conn, baseline_id)}
+    return [a for a in alert_rules.session_alerts(conn, session_id) if (a['rule'], a['src'], a['dst']) not in before]
 
 def _new_operations(conn, session_id, baseline_id):
     """Operations a client sent a server that it didn't in the baseline, most consequential first."""

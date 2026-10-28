@@ -372,3 +372,17 @@ def test_reanalyze_clears_operations(client):
     with storage.connect(app_module.DB_PATH) as conn:
         assert storage.reset_analysis(conn, 1)
         assert storage.list_operations(conn, 1)[1] == 0
+
+def test_alerts_api_csv_host_panel_and_compare(client):
+    from packet_builder import modbus_adu
+    upload(client, data=pcap_bytes([tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, modbus_adu(3, b'\x00\x00\x00\x01'))]),
+           name='before.pcap')
+    upload(client, data=ics_pcap(), name='after.pcap')
+    data = client.get('/api/sessions/2/alerts').get_json()
+    assert [(a['severity'], a['title']) for a in data['alerts']] == [('low', 'Writes to a device')]
+    assert data['counts'] == {'high': 0, 'medium': 0, 'low': 1}
+    assert client.get('/api/sessions/1/alerts').get_json()['alerts'] == []
+    assert 'low,Writes to a device,10.0.0.57,10.0.0.3,Modbus,Write Single Register,1' in client.get('/sessions/2/alerts.csv').data.decode()
+    assert [a['rule'] for a in client.get('/api/sessions/2/hosts/10.0.0.3').get_json()['alerts']] == ['write']
+    diff = client.get('/api/sessions/2/compare?baseline=1').get_json()
+    assert [a['rule'] for a in diff['new_alerts']['items']] == ['write']

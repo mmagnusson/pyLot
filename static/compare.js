@@ -34,7 +34,15 @@
         { key: 'count', label: 'Count', num: true, format: fmt }, { key: 'first_seen', label: 'First seen', format: when }
     ];
 
+    const alertColumns = [
+        { key: 'severity', label: 'Severity', format: severity => el('span', { class: `severity severity-${severity}`, text: severity }) },
+        { key: 'title', label: 'Alert' }, { key: 'src', label: 'Client', format: (v, a) => v || (a.clients || []).join(', ') },
+        { key: 'dst', label: 'Device', format: v => v || 'many' }, { key: 'operations', label: 'Operations', format: v => v.join(', ') },
+        { key: 'count', label: 'Count', num: true, format: fmt }, { key: 'first_seen', label: 'First seen', format: when }
+    ];
+
     const SECTIONS = [
+        ['new_alerts', 'New alerts', alertColumns, true],
         ['new_hosts', 'New hosts', hostColumns, true],
         ['changed_hosts', 'Hosts that changed', changeColumns, true],
         ['new_operations', 'New industrial operations', operationColumns, true],

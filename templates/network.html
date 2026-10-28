@@ -22,6 +22,7 @@
             <div class="stat-box"><strong id="host-count">…</strong> hosts</div>
             <div class="stat-box"><strong id="classified-count">…</strong> classified by fingerprints</div>
             <div class="stat-box"><strong id="edge-count">…</strong> host pairs talking</div>
+            <a class="stat-box hidden" id="alert-box" href="#alerts"><strong id="alert-count"></strong> <span id="alert-label">alerts</span></a>
             <div class="stat-box"><strong id="packet-count">{{ '{:,}'.format(session.packet_count) }}</strong> packets</div>
             <div class="stat-box">Status: <strong id="status">{{ session.status }}</strong></div>
             <form id="stop-form" method="post" action="{{ url_for('stop_capture', session_id=session.id) }}"
@@ -43,6 +44,7 @@
     <div class="card">
         <div class="tabs">
             <button class="tab active" data-tab="graph">Logical</button>
+            <button class="tab" data-tab="alerts">Alerts</button>
             <button class="tab" data-tab="physical">Physical</button>
             <button class="tab" data-tab="hosts">Hosts</button>
             <button class="tab" data-tab="devices">Devices</button>
@@ -72,6 +74,24 @@
                 <a class="btn secondary" href="{{ url_for('export_flows', session_id=session.id) }}">Flows CSV</a>
             </div>
             <div id="cy"></div>
+        </div>
+
+        <div id="tab-alerts" class="tab-pane hidden">
+            <div class="toolbar">
+                <select id="alerts-severity">
+                    <option value="">All severities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+                <input type="search" id="alerts-filter" placeholder="Search address, protocol or operation..." style="width: 300px">
+                <span class="spacer"></span>
+                <a class="btn secondary" href="{{ url_for('export_alerts', session_id=session.id) }}">Alerts CSV</a>
+            </div>
+            <p class="hint tab-hint">Risky activity found in the decoded industrial operations and flows: program changes, controllers
+               stopped or restarted, control commands and writes, devices changed from several hosts, fuzzing, device enumeration and
+               scans. Each alert covers one client and one device, however often it happened. Click one for details.</p>
+            <div id="alerts-table"></div>
         </div>
 
         <div id="tab-physical" class="tab-pane hidden">
