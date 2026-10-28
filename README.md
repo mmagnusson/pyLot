@@ -241,6 +241,8 @@ The database is automatically created on first run.
 
 ## Development
 
+Where the project stands and what's planned next is in `PROGRESS.md`.
+
 The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
