@@ -1,0 +1,18 @@
+sw-core-1#show mac address-table
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+  10    000e.8c11.2233    DYNAMIC     Gi1/0/1
+  10    0050.0493.7067    DYNAMIC     Gi1/0/1
+  10    0002.b3ce.7051    DYNAMIC     Gi1/0/5
+sw-core-1#show lldp neighbors detail
+------------------------------------------------
+Local Intf: Gi1/0/1
+Chassis id: 001b.54cc.dd01
+Port id: Gi1/0/24
+Port Description: Uplink to core
+System Name: sw-access-1
+
+Management Addresses:
+    IP: 10.0.0.2
+------------------------------------------------
+Total entries displayed: 1

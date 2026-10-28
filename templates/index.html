@@ -115,6 +115,7 @@
 <body>
     <div class="container">
         <h1>pyLot</h1>
+        <p style="text-align: center"><a href="{{ url_for('networks_view') }}">Networks</a></p>
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}
@@ -144,7 +145,7 @@
         <div class="sessions">
             <h2>Sessions</h2>
             <table>
-                <tr><th>Name</th><th>Source</th><th>Status</th><th>Packets</th><th>Hosts</th><th>Created (UTC)</th><th></th></tr>
+                <tr><th>Name</th><th>Source</th><th>Status</th><th>Packets</th><th>Hosts</th><th>Created (UTC)</th><th></th><th></th></tr>
                 {% for s in sessions %}
                 <tr>
                     <td><a href="{{ url_for('session_view', session_id=s.id) }}">{{ s.name }}</a></td>
@@ -153,6 +154,7 @@
                     <td>{{ '{:,}'.format(s.packet_count) }}</td>
                     <td>{{ '{:,}'.format(s.host_count) }}</td>
                     <td>{{ s.created_at }}</td>
+                    <td>{% if sessions|length > 1 %}<a href="{{ url_for('compare_view', session_id=s.id) }}">Compare</a>{% endif %}</td>
                     <td>
                         <form method="post" action="{{ url_for('delete_session', session_id=s.id) }}" onsubmit="return confirm('Delete this session and its capture file?')">
                             <button type="submit" class="link-btn">Delete</button>

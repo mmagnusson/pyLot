@@ -12,10 +12,19 @@ Python web application.
 - Loads fingerprints in GRASSMARLIN's own XML format as well as the YAML conversions in `fingerprints/`
 - Hosts, flows, MAC addresses and ARP bindings, with MAC vendor lookup that doesn't credit a
   router's MAC to the remote hosts behind it
-- Network graph grouped by network, colored by device category and shaped by role; hosts behind a
-  router are merged into one node when there are many of them
-- Sortable, searchable host and flow tables, a details panel for every host and connection, and
-  PNG, JSON and CSV exports
+- Logical view: a network graph grouped by network, colored by device category and shaped by role;
+  hosts behind a router are merged into one node when there are many of them
+- Named networks: give address ranges names on the Networks page, or by clicking a network in the
+  graph, and every session groups its hosts by them
+- Layer-2 devices: LLDP, CDP and STP from network gear, and the industrial protocols that run without IP
+  (PROFINET DCP and RT, IEC 61850 GOOSE and Sampled Values, EtherCAT, POWERLINK, MRP) identify and
+  classify devices, including ones that never send IP traffic
+- Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
+  see which device is plugged into which port, how switches connect, and where the capture was taken
+- Baseline comparison: new and missing hosts, MAC addresses and conversations, and hosts whose MAC or
+  classification changed since a known-good capture
+- Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
+  and CSV exports
 
 ## Installation
 
@@ -63,6 +72,24 @@ Python web application.
    - Click a host or connection for details, including every fingerprint result and its
      confidence (1 is high, 5 is low, as in GRASSMARLIN). The Hosts and Flows tabs list everything
 
+3. **Name your networks (optional):** open Networks from any page and add ranges such as
+   `10.20.0.0/24  Packaging line`. Hosts outside named networks are grouped by /24 (IPv4) and /64
+   (IPv6); you can change or turn off that automatic grouping on the same page.
+
+4. **Add switch data for the physical view (optional):** on a session's Physical tab, upload or paste
+   the output of these commands from each Cisco IOS, IOS-XE or NX-OS switch, in one file or several:
+   ```
+   show running-config
+   show mac address-table
+   show cdp neighbors detail      (or: show lldp neighbors detail)
+   ```
+   pyLot places each device on the access port where it was learned, rather than the uplinks it was
+   also learned on. Without switch data the Physical tab still shows each device's VLAN, and the
+   switch and port the capture is plugged into when LLDP or CDP was captured.
+
+5. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
+   list, and pick an earlier capture of the network in a known-good state.
+
 Live capture saves to its session every couple of seconds; use the Refresh button on its page to see
 new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is marked
 "stopped" or "failed" on the next start.
@@ -103,12 +130,18 @@ The application uses SQLite (`pylot.sqlite3`) to store:
   router MAC it was reached through when it isn't
 - **flows**: traffic between two hosts per protocol and port pair, with packet and byte counts
 - **evidence**: every fingerprint result for a host, with its confidence
-- **mac_addresses** and **arp_bindings**: layer-2 observations
+- **mac_addresses**, **arp_bindings**, **mac_vlans**: layer-2 observations
+- **l2_flows** and **mac_evidence**: traffic without IP, and what layer-2 protocols say about each MAC
+- **switches**, **switch_ports**, **switch_macs**, **switch_neighbors**: imported switch data, per session
+- **networks** and **settings**: named networks and automatic grouping, shared by all sessions
 
 The database is automatically created on first run.
 
 ## Troubleshooting
 
+- **A device is on the wrong switch port**: pyLot prefers access ports, recognizing uplinks by trunk
+  mode, port channels and CDP/LLDP neighbors. Include `show running-config` and the neighbors output
+  so it can tell them apart
 - **Live capture fails**: The session shows dumpcap's error. Usually you need to be in the
   wireshark group (log out and back in after adding yourself) or the interface name is wrong
   (`ip link` lists them)
@@ -126,9 +159,11 @@ The application structure:
 - `parser/packets.py`: pcap/pcapng decoding (dpkt)
 - `parser/fingerprint_loader.py`, `parser/fingerprint_matcher.py`: the fingerprint engine
 - `parser/analysis.py`: hosts, flows and evidence for one capture
+- `parser/layer2.py`: LLDP, CDP, STP and industrial Ethernet decoding
+- `parser/switch_config.py`: Cisco switch output parsing for the physical view
 - `capture/live_capture.py`: Real-time capture with dumpcap
 - `templates/`: HTML templates
-- `static/session.js`, `static/style.css`: the session page
+- `static/`: page scripts (`session.js`, `networks.js`, `compare.js`, shared `common.js`) and `style.css`
 - `tests/`: pytest suite
 
 Run the tests with:

@@ -7,11 +7,14 @@ from typing import BinaryIO, Iterator, Optional
 
 import dpkt
 
+from parser import layer2
+
 logger = logging.getLogger(__name__)
 
 PCAPNG_MAGIC = b'\x0a\x0d\x0d\x0a'
 ETHERTYPE_IPV4 = 0x0800
 ETHERTYPE_IPV6 = 0x86DD
+ETHERTYPE_ARP = 0x0806
 DLT_LINUX_SLL2 = 276
 RAW_IP_LINKTYPES = (12, 14, 101, 228, 229)
 LOOPBACK_LINKTYPES = (0, 108)
@@ -40,6 +43,9 @@ class Packet:
     mss: Optional[int] = None
     payload: bytes = b''             # TCP or UDP payload
     arp: Optional[tuple] = None      # (operation, sender MAC, sender IP, target MAC, target IP)
+    vlan: Optional[int] = None       # outer 802.1Q VLAN ID
+    l2_protocol: Optional[str] = None  # protocol of a frame that carries neither IP nor ARP
+    l2_properties: tuple = ()        # what that frame says about its sender: (name, value, confidence)
 
 def read_capture(stream: BinaryIO) -> Iterator[Packet]:
     """
@@ -78,15 +84,30 @@ def decode_frame(frame: int, ts: float, buf: bytes, linktype: int) -> Packet:
     if linktype == dpkt.pcap.DLT_EN10MB:
         eth = dpkt.ethernet.Ethernet(buf)
         pkt.src_mac, pkt.dst_mac = eth.src.hex(':'), eth.dst.hex(':')
+        tags = getattr(eth, 'vlan_tags', None) or []
+        if tags and tags[0].id:  # VLAN 0 is a priority tag, not a VLAN
+            pkt.vlan = tags[0].id
         # Values below 0x600 are 802.3 lengths, not EtherTypes
-        pkt.ethertype = eth.type if eth.type >= 0x600 else None
+        header = 14 + 4 * len(tags)
+        inner_type = tags[-1].type if tags else eth.type
+        pkt.ethertype = inner_type if inner_type >= 0x600 else None
         l3 = eth.data
+        if pkt.ethertype not in (ETHERTYPE_IPV4, ETHERTYPE_IPV6, ETHERTYPE_ARP):
+            # Decode from the raw bytes: re-packing dpkt's objects can change them (it recomputes CDP checksums)
+            payload = buf[header:] if pkt.ethertype else buf[header:header + inner_type]
+            pkt.l2_protocol, properties = layer2.decode(pkt.ethertype, payload, pkt.dst_mac)
+            pkt.l2_properties = tuple(properties)
+            return pkt
     elif linktype in (dpkt.pcap.DLT_LINUX_SLL, DLT_LINUX_SLL2):
         sll = dpkt.sll.SLL(buf) if linktype == dpkt.pcap.DLT_LINUX_SLL else dpkt.sll2.SLL2(buf)
         if sll.hlen == 6:
             pkt.src_mac = sll.hdr[:6].hex(':')
         pkt.ethertype = sll.ethtype
         l3 = sll.data
+        if pkt.ethertype not in (ETHERTYPE_IPV4, ETHERTYPE_IPV6, ETHERTYPE_ARP) and pkt.ethertype >= 0x600:
+            pkt.l2_protocol, properties = layer2.decode(pkt.ethertype, bytes(l3), None)
+            pkt.l2_properties = tuple(properties)
+            return pkt
     elif linktype in LOOPBACK_LINKTYPES:
         l3 = dpkt.loopback.Loopback(buf).data
     else:

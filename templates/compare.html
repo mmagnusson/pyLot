@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Compare {{ session.name }} - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-session-id="{{ session.id }}">
+<div class="page">
+    <nav class="top-nav"><a href="/">← Sessions</a><a href="{{ url_for('session_view', session_id=session.id) }}">Back to {{ session.name }}</a></nav>
+
+    <div class="card section">
+        <h1>What changed in {{ session.name }}</h1>
+        <form method="get" class="form-row">
+            <label>Compared with the baseline
+                <select name="baseline" id="baseline" onchange="this.form.submit()">
+                    <option value="">Choose a session…</option>
+                    {% for s in sessions %}
+                    <option value="{{ s.id }}" {{ 'selected' if s.id == baseline_id else '' }}>{{ s.name }} ({{ s.created_at }}, {{ '{:,}'.format(s.host_count) }} hosts)</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <noscript><button type="submit" class="btn">Compare</button></noscript>
+        </form>
+        {% if not sessions %}<p class="hint">There are no other sessions to compare with yet.</p>{% endif %}
+        <p class="hint">A baseline is a capture of the network when it was known to be normal. Hosts and MAC addresses
+           are compared by address; conversations by client, server and service port, so a new client port is not a change.</p>
+        <div id="summary" class="summary-grid"></div>
+    </div>
+    <div id="sections"></div>
+</div>
+<script src="{{ url_for('static', filename='common.js') }}"></script>
+<script src="{{ url_for('static', filename='compare.js') }}"></script>
+</body>
+</html>

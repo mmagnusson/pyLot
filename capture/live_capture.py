@@ -23,6 +23,10 @@ def list_interfaces():
         result = subprocess.run(['dumpcap', '-D'], capture_output=True, text=True, timeout=15)
     except FileNotFoundError:
         raise RuntimeError("dumpcap isn't installed (it comes with Wireshark)")
+    except PermissionError:
+        raise RuntimeError("you aren't allowed to run dumpcap; join the wireshark group, then log out and back in")
+    except OSError as e:
+        raise RuntimeError(f"dumpcap couldn't be run: {e}")
     except subprocess.TimeoutExpired:
         raise RuntimeError('dumpcap took too long to list interfaces')
     if result.returncode != 0:

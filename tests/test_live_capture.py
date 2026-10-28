@@ -72,6 +72,13 @@ def test_list_interfaces_reports_dumpcap_errors(monkeypatch):
     with pytest.raises(RuntimeError, match='permission denied'):
         live_capture.list_interfaces()
 
+def test_list_interfaces_when_dumpcap_cant_be_run(monkeypatch):
+    def refuse(*args, **kwargs):
+        raise PermissionError(13, 'Permission denied', 'dumpcap')
+    monkeypatch.setattr(live_capture.subprocess, 'run', refuse)
+    with pytest.raises(RuntimeError, match='wireshark group'):
+        live_capture.list_interfaces()
+
 def test_stopped_capture_is_not_a_failure(db_path, monkeypatch):
     # dumpcap killed before writing anything: empty output, SIGTERM exit code
     monkeypatch.setattr(live_capture.subprocess, 'Popen', lambda cmd, **kw: FakeDumpcap(returncode=-15))

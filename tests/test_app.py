@@ -172,3 +172,73 @@ def test_stopping_a_capture_this_process_no_longer_runs(client):
         session_id = storage.create_session(conn, 'Live capture on eth9', 'live', 'capturing')
     assert client.post(f'/sessions/{session_id}/stop').status_code == 302
     assert client.get(f'/api/sessions/{session_id}').get_json()['status'] == 'stopped'
+
+# --- Phase 3
+
+from packet_builder import goose_frame, lldp_frame  # noqa: E402
+
+SWITCH_TEXT = """sw-access-1#show mac address-table
+  10    0050.0493.7067    DYNAMIC     Gi1/0/2
+"""
+
+def test_named_networks_api(client):
+    response = client.post('/api/networks', json={'cidr': '10.0.0.0/24', 'name': 'Process control'})
+    assert response.status_code == 201
+    network = response.get_json()
+    assert client.post('/api/networks', json={'cidr': '10.0.0.0/24'}).status_code == 400
+    assert client.post('/api/networks', json={'cidr': 'nope'}).get_json()['error']
+    assert client.post('/api/networks', data='not json').status_code == 400
+    assert client.put(f"/api/networks/{network['id']}", json={'name': 'Cell 1'}).get_json()['name'] == 'Cell 1'
+    upload(client)
+    groups = client.get('/api/sessions/1/graph').get_json()['groups']
+    assert groups[0]['label'] == 'Cell 1 (10.0.0.0/24)'
+    assert client.get('/api/networks').get_json()['networks'][0]['name'] == 'Cell 1'
+    assert client.delete(f"/api/networks/{network['id']}").status_code == 204
+    assert client.delete(f"/api/networks/{network['id']}").status_code == 404
+    assert client.get('/networks').status_code == 200
+
+def test_settings_api(client):
+    assert client.put('/api/settings', json={'auto_prefix_v4': 16}).get_json()['auto_prefix_v4'] == 16
+    assert client.put('/api/settings', json={'auto_prefix_v4': '16'}).status_code == 400
+    assert client.put('/api/settings', json={'nope': 1}).status_code == 400
+    assert client.get('/api/networks').get_json()['settings'] == {'auto_prefix_v4': 16, 'auto_prefix_v6': 64}
+
+def test_cross_site_json_writes_are_refused(client):
+    assert client.post('/api/networks', json={'cidr': '10.0.0.0/24'}, headers={'Origin': 'http://evil.example'}).status_code == 403
+    assert client.delete('/api/networks/1', headers={'Origin': 'http://evil.example'}).status_code == 403
+
+def test_devices_and_physical_view(client):
+    upload(client, pcap_bytes([lldp_frame('00:1b:54:cc:dd:01', 'sw-access-1', 'Gi1/0/5'), goose_frame('00:0e:8c:11:22:33'),
+                               tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, b'')]))
+    devices = client.get('/api/sessions/1/devices?sort=mac').get_json()
+    assert devices['total'] == 3
+    ied = client.get('/api/sessions/1/devices/00:0E:8C:11:22:33').get_json()
+    assert ied['category'] == 'IED' and ied['l2_flows'][0]['protocol'] == 'IEC 61850 GOOSE'
+    assert client.get('/api/sessions/1/devices/aa:bb:cc:dd:ee:ff').status_code == 404
+
+    response = client.post('/api/sessions/1/switches', data={'config_file': (io.BytesIO(SWITCH_TEXT.encode()), 'sw1.txt')})
+    assert response.status_code == 201 and response.get_json()['name'] == 'sw-access-1' and response.get_json()['macs'] == 1
+    assert client.post('/api/sessions/1/switches', data={'config_text': 'nothing useful'}).status_code == 400
+    assert client.post('/api/sessions/1/switches', data={'config_file': (io.BytesIO(b'\x00\x01'), 'x.bin')}).status_code == 400
+    assert client.post('/api/sessions/1/switches', data={'config_text': SWITCH_TEXT, 'name': 'Pasted'}).get_json()['name'] == 'Pasted'
+
+    graph = client.get('/api/sessions/1/physical').get_json()
+    assert {s['name'] for s in graph['switches']} == {'sw-access-1', 'Pasted'}
+    assert any(e['source'] == 'capture' for e in graph['edges'])
+    switch_id = graph['switches'][0]['id']
+    assert client.delete(f'/api/sessions/1/switches/{switch_id}').status_code == 204
+    assert client.delete(f'/api/sessions/1/switches/{switch_id}').status_code == 404
+
+    csv_text = client.get('/sessions/1/devices.csv').get_data(as_text=True)
+    assert csv_text.splitlines()[0].startswith('mac,vendor,name,ips,vlans') and 'IEC 61850 GOOSE' in csv_text
+
+def test_compare_sessions(client):
+    upload(client)
+    upload(client, pcap_bytes([tcp_frame('10.0.0.57', '10.0.0.9', 2578, 22, b'')]))
+    diff = client.get('/api/sessions/2/compare?baseline=1').get_json()
+    assert diff['baseline']['id'] == 1
+    assert [h['ip'] for h in diff['new_hosts']['items']] == ['10.0.0.9']
+    assert [h['ip'] for h in diff['missing_hosts']['items']] == ['10.0.0.3']
+    assert client.get('/api/sessions/2/compare').status_code == 400
+    assert client.get('/api/sessions/2/compare?baseline=99').status_code == 400
+    assert client.get('/sessions/2/compare?baseline=1').status_code == 200

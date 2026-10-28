@@ -52,10 +52,14 @@ class CaptureAnalyzer:
         self.macs = {}                          # source MAC -> Traffic
         self.arp = {}                           # (ip, mac) from ARP sender fields -> Traffic
         self.evidence = {}                      # (ip, fingerprint, property, value) -> Evidence
+        self.l2_flows = {}                      # (src MAC, dst MAC, protocol) -> Traffic, for frames without IP or ARP
+        self.mac_evidence = {}                  # (MAC, protocol, property, value) -> Evidence, from layer-2 announcements
+        self.vlans = Counter()                  # (source MAC, VLAN ID) -> frames
         self._src_macs = defaultdict(Counter)   # ip -> MACs its packets came from
         self._dst_macs = defaultdict(Counter)   # ip -> MACs its packets were sent to
         self._mac_ips = defaultdict(set)        # MAC -> IPs it carried, in either direction
-        self._dirty = {'flows': set(), 'macs': set(), 'arp': set(), 'evidence': set()}
+        self._dirty = {'flows': set(), 'macs': set(), 'arp': set(), 'evidence': set(), 'l2_flows': set(),
+                       'mac_evidence': set(), 'vlans': set()}
 
     def add(self, pkt):
         self.packet_count += 1
@@ -64,6 +68,12 @@ class CaptureAnalyzer:
         self.last_seen = max(self.last_seen or pkt.time, pkt.time)
         if pkt.src_mac:
             self._count(self.macs, 'macs', pkt.src_mac, pkt)
+            if pkt.vlan is not None:
+                self.vlans[(pkt.src_mac, pkt.vlan)] += 1
+                self._dirty['vlans'].add((pkt.src_mac, pkt.vlan))
+        if pkt.l2_protocol:
+            self._layer2(pkt)
+            return
         if pkt.arp and pkt.arp[2] != '0.0.0.0':  # 0.0.0.0 senders are address-conflict probes
             self._count(self.arp, 'arp', (pkt.arp[2], pkt.arp[1]), pkt)
         if pkt.src_ip is None:
@@ -86,14 +96,24 @@ class CaptureAnalyzer:
 
         for annotation in self.engine.evaluate(pkt):
             for name, value in annotation.properties.items():
-                key = (annotation.ip, annotation.fingerprint, name, value)
-                evidence = self.evidence.get(key)
-                if evidence is None:
-                    self.evidence[key] = Evidence(annotation.confidence, 1, pkt.frame)
-                else:
-                    evidence.count += 1
-                    evidence.confidence = min(evidence.confidence, annotation.confidence)
-                self._dirty['evidence'].add(key)
+                self._add_evidence(self.evidence, 'evidence', (annotation.ip, annotation.fingerprint, name, value),
+                                   annotation.confidence, pkt.frame)
+
+    def _layer2(self, pkt):
+        if not pkt.src_mac:
+            return
+        self._count(self.l2_flows, 'l2_flows', (pkt.src_mac, pkt.dst_mac or '', pkt.l2_protocol), pkt)
+        for name, value, confidence in pkt.l2_properties:
+            self._add_evidence(self.mac_evidence, 'mac_evidence', (pkt.src_mac, pkt.l2_protocol, name, value), confidence, pkt.frame)
+
+    def _add_evidence(self, table, dirty_name, key, confidence, frame):
+        evidence = table.get(key)
+        if evidence is None:
+            table[key] = Evidence(confidence, 1, frame)
+        else:
+            evidence.count += 1
+            evidence.confidence = min(evidence.confidence, confidence)
+        self._dirty[dirty_name].add(key)
 
     def _host(self, ip, time):
         host = self.hosts.get(ip)
@@ -184,3 +204,17 @@ class CaptureAnalyzer:
         """(ip, fingerprint, name, value, confidence, count, first_frame)"""
         return [key + (e.confidence, e.count, e.first_frame)
                 for key in self._keys(self.evidence, 'evidence', only_dirty) for e in [self.evidence[key]]]
+
+    def l2_flow_rows(self, only_dirty=False):
+        """(src_mac, dst_mac, protocol, packets, bytes, first_seen, last_seen)"""
+        return [key + (t.packets, t.bytes, t.first_seen, t.last_seen)
+                for key in self._keys(self.l2_flows, 'l2_flows', only_dirty) for t in [self.l2_flows[key]]]
+
+    def mac_evidence_rows(self, only_dirty=False):
+        """(mac, protocol, name, value, confidence, count, first_frame)"""
+        return [key + (e.confidence, e.count, e.first_frame)
+                for key in self._keys(self.mac_evidence, 'mac_evidence', only_dirty) for e in [self.mac_evidence[key]]]
+
+    def vlan_rows(self, only_dirty=False):
+        """(mac, vlan, packets)"""
+        return [key + (self.vlans[key],) for key in self._keys(self.vlans, 'vlans', only_dirty)]

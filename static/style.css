@@ -247,3 +247,114 @@ table.data td.num {
 .hidden {
     display: none !important;
 }
+.top-nav {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 20px;
+}
+.page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.section {
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.section h2 {
+    margin-top: 0;
+}
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin: 10px 0;
+}
+.hint {
+    font-size: 13px;
+    color: #666;
+}
+.error-text {
+    color: #842029;
+    font-size: 13px;
+}
+.link-btn {
+    background: none;
+    border: none;
+    color: #0074D9;
+    cursor: pointer;
+    padding: 0;
+    font-size: inherit;
+}
+.link-btn.danger {
+    color: #d9534f;
+}
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 140px;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+.physical-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+}
+.physical-layout #cy-physical {
+    height: 650px;
+    background-color: #fafafa;
+}
+.physical-layout aside {
+    border-left: 1px solid #dee2e6;
+    padding: 15px;
+    font-size: 14px;
+    overflow-y: auto;
+    max-height: 650px;
+}
+.physical-layout aside h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+}
+.switch-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px;
+}
+.switch-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+.summary-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 10px 0 0;
+}
+.summary-grid .stat-box.warn {
+    background: #fff8e1;
+    border-left-color: #f0ad4e;
+}
+.summary-grid .stat-box.warn strong {
+    color: #b06d00;
+}
+.change-before {
+    color: #842029;
+}
+.change-now {
+    color: #1e7e34;
+}
+@media (max-width: 900px) {
+    .physical-layout {
+        grid-template-columns: 1fr;
+    }
+    .physical-layout aside {
+        border-left: none;
+        border-top: 1px solid #dee2e6;
+    }
+}

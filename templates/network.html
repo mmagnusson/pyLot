@@ -10,7 +10,11 @@
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
 </head>
 <body data-session-id="{{ session.id }}">
-    <a href="/" class="back-link">← Back to sessions</a>
+    <nav class="top-nav">
+        <a href="/">← Sessions</a>
+        <a href="{{ url_for('networks_view') }}">Networks</a>
+        <a href="{{ url_for('compare_view', session_id=session.id) }}">Compare with a baseline</a>
+    </nav>
 
     <div class="card header">
         <h1>{{ session.name }}</h1>
@@ -31,8 +35,10 @@
 
     <div class="card">
         <div class="tabs">
-            <button class="tab active" data-tab="graph">Graph</button>
+            <button class="tab active" data-tab="graph">Logical</button>
+            <button class="tab" data-tab="physical">Physical</button>
             <button class="tab" data-tab="hosts">Hosts</button>
+            <button class="tab" data-tab="devices">Devices</button>
             <button class="tab" data-tab="flows">Flows</button>
         </div>
 
@@ -52,12 +58,54 @@
             <div id="cy"></div>
         </div>
 
+        <div id="tab-physical" class="tab-pane hidden">
+            <div class="toolbar">
+                <span id="physical-summary" class="hint"></span>
+                <button class="btn secondary" id="physical-fit">Fit to view</button>
+                <button class="btn secondary" id="physical-relayout">Re-layout</button>
+                <span class="spacer"></span>
+                <button class="btn secondary" id="physical-png">PNG</button>
+            </div>
+            <div class="physical-layout">
+                <div id="cy-physical"></div>
+                <aside>
+                    <h3>Imported switches</h3>
+                    <ul id="switch-list" class="switch-list"></ul>
+                    <h3>Import switch data</h3>
+                    <form id="switch-form">
+                        <p class="hint">Cisco IOS or NX-OS output of <code>show running-config</code>, <code>show mac address-table</code>
+                           and <code>show cdp neighbors detail</code> or <code>show lldp neighbors detail</code>, in one file or several.</p>
+                        <input type="file" name="config_file" accept=".txt,.log,.cfg,.conf,text/plain">
+                        <p class="hint">or paste it:</p>
+                        <textarea name="config_text" placeholder="sw1#show mac address-table"></textarea>
+                        <div class="form-row">
+                            <input type="text" name="name" maxlength="100" placeholder="Name (default: its hostname)" style="width: 180px">
+                            <button type="submit" class="btn">Import</button>
+                        </div>
+                        <p id="switch-error" class="error-text"></p>
+                    </form>
+                    <p class="hint">Without imports, the view shows what the capture itself reveals: the switch and port that
+                       LLDP or CDP announced to the capture point, and every device's VLAN. Faded devices are only in a MAC table.</p>
+                </aside>
+            </div>
+        </div>
+
         <div id="tab-hosts" class="tab-pane hidden">
             <div class="toolbar">
                 <input type="search" id="hosts-filter" placeholder="Search IP, MAC, vendor, category, role, fingerprint..." style="width: 340px">
             </div>
             <div id="hosts-table"></div>
             <div id="hosts-pager" class="pager"></div>
+        </div>
+
+        <div id="tab-devices" class="tab-pane hidden">
+            <div class="toolbar">
+                <input type="search" id="devices-filter" placeholder="Search MAC, vendor, name, IP, protocol, switch, vlan 10..." style="width: 340px">
+                <span class="spacer"></span>
+                <a class="btn secondary" href="{{ url_for('export_devices', session_id=session.id) }}">Devices CSV</a>
+            </div>
+            <div id="devices-table"></div>
+            <div id="devices-pager" class="pager"></div>
         </div>
 
         <div id="tab-flows" class="tab-pane hidden">
@@ -72,6 +120,7 @@
 
     <div id="panel" class="panel hidden"></div>
 
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
     <script src="{{ url_for('static', filename='session.js') }}"></script>
 </body>
 </html>

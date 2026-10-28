@@ -26,28 +26,8 @@
 
     // --- helpers
 
-    function el(tag, props = {}, ...children) {
-        const node = document.createElement(tag);
-        for (const [key, value] of Object.entries(props)) {
-            if (key === 'class') node.className = value;
-            else if (key === 'text') node.textContent = value;
-            else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
-            else node.setAttribute(key, value);
-        }
-        children.filter(child => child != null).forEach(child => node.append(child));  // strings become text nodes
-        return node;
-    }
-
-    const fmt = n => (n == null ? '' : Number(n).toLocaleString());
-    const when = t => (t == null ? '' : new Date(t * 1000).toLocaleString());
+    const { el, fmt, when, getJSON, sendJSON, table } = pyLot;
     const portPair = f => (f.src_port || f.dst_port ? `${f.src_port} → ${f.dst_port}` : '');
-
-    async function getJSON(url) {
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || response.statusText);
-        return data;
-    }
 
     function setText(id, text) {
         document.getElementById(id).textContent = text;
@@ -106,7 +86,7 @@
 
     function searchText(node) {
         const values = Object.values(node.properties).flatMap(p => p.values);
-        return [node.ip, node.mac, node.vendor, node.via_mac, node.kind, ...node.fingerprints, ...values]
+        return [node.ip, node.mac, node.vendor, node.via_mac, node.kind, ...node.fingerprints, ...node.layer2, ...values]
             .filter(Boolean).join(' ').toLowerCase();
     }
 
@@ -165,7 +145,7 @@
         const large = data.nodes.length > MAX_FORCE_LAYOUT_NODES;
         const showEdgeLabels = data.edges.length <= MAX_EDGE_LABELS;
         const categories = new Set();
-        const groups = large ? [] : data.groups.map(g => ({ data: { id: `group:${g.id}`, label: g.label, isGroup: true } }));
+        const groups = large ? [] : data.groups.map(g => ({ data: { id: `group:${g.id}`, label: g.label, isGroup: true, group: g } }));
         const nodes = data.nodes.map(node => {
             const category = firstToken(node.category);
             if (category) categories.add(category);
@@ -231,7 +211,10 @@
 
         cy.on('tap', 'node', event => {
             const node = event.target;
-            if (node.data('isGroup')) return;
+            if (node.data('isGroup')) {
+                showGroupPanel(node.data('group'));
+                return;
+            }
             select(node);
             const host = node.data('host');
             if (host.merged) showMergedPanel(host);
@@ -300,18 +283,12 @@
     function closePanel() {
         document.getElementById('panel').classList.add('hidden');
         if (cy) cy.elements().removeClass('selected');
+        if (physicalCy) physicalCy.elements().removeClass('selected');
     }
 
     function facts(pairs) {
         return el('dl', {}, ...pairs.filter(([, value]) => value != null && value !== '')
             .flatMap(([label, value]) => [el('dt', { text: label }), el('dd', { text: String(value) })]));
-    }
-
-    function table(columns, rows, onRowClick) {
-        const head = el('tr', {}, ...columns.map(c => el('th', { text: c.label })));
-        const body = rows.map(row => el('tr', onRowClick ? { class: 'clickable', onclick: () => onRowClick(row) } : {},
-            ...columns.map(c => el('td', c.num ? { class: 'num' } : {}, String((c.format || (v => v ?? ''))(row[c.key], row))))));
-        return el('div', { class: 'table-wrap' }, el('table', { class: 'data' }, el('thead', {}, head), el('tbody', {}, ...body)));
     }
 
     const PANEL_FLOW_COLUMNS = [
@@ -331,7 +308,7 @@
         }
         const properties = Object.entries(host.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(ip,
-            facts([['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
+            facts([['Network', host.network], ['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
                    ['Address type', host.kind === 'unicast' ? null : host.kind],
                    ['ARP', host.arp.map(a => a.mac).join(', ')],
                    ['Packets', `${fmt(host.packets_sent)} sent, ${fmt(host.packets_received)} received`],
@@ -349,10 +326,53 @@
                          { key: 'confidence', label: 'Conf.', num: true }, { key: 'count', label: 'Packets', num: true, format: fmt },
                          { key: 'first_frame', label: 'First frame', num: true }], host.evidence)
                 : null,
+            ...layer2Evidence(host.layer2_evidence),
+            host.mac ? el('p', {}, el('a', { href: '#', text: `Layer-2 details for ${host.mac}`,
+                                            onclick: event => { event.preventDefault(); showDevicePanel(host.mac); } })) : null,
             el('h3', { text: `Flows (${host.flows.length < host.flow_count ? `busiest ${host.flows.length} of ${fmt(host.flow_count)}` : fmt(host.flow_count)})` }),
             table(PANEL_FLOW_COLUMNS, host.flows),
             el('p', {}, el('a', { href: '#', text: 'Show all of its flows in the Flows tab',
                                   onclick: event => { event.preventDefault(); closePanel(); flowsTable.setHost(ip); showTab('flows'); } })));
+    }
+
+    function layer2Evidence(evidence) {
+        if (!evidence || !evidence.length) return [];
+        return [el('h3', { text: `Layer-2 announcements (${evidence.length})` }),
+                table([{ key: 'protocol', label: 'Protocol' }, { key: 'name', label: 'Property' }, { key: 'value', label: 'Value' },
+                       { key: 'confidence', label: 'Conf.', num: true }, { key: 'count', label: 'Frames', num: true, format: fmt }], evidence)];
+    }
+
+    function showGroupPanel(group) {
+        const rows = [['Hosts', fmt(group.hosts)], ['Network', group.cidr]];
+        if (group.network_id) {
+            openPanel(group.label, facts(rows),
+                el('p', { class: 'hint', text: 'A named network. Rename or delete it on the Networks page.' }),
+                el('p', {}, el('a', { href: '/networks', text: 'Manage networks' })));
+            return;
+        }
+        if (!group.cidr) {
+            openPanel(group.label, facts(rows), el('p', { class: 'hint', text: group.id.startsWith('via:')
+                ? 'Hosts on other networks, reached through this router. Name their network on the Networks page to group them by address instead.'
+                : 'Addresses that are not single hosts.' }));
+            return;
+        }
+        const cidr = el('input', { type: 'text', value: group.cidr, style: 'width: 160px' });
+        const name = el('input', { type: 'text', placeholder: 'Name, e.g. Packaging line', maxlength: '100', style: 'width: 220px' });
+        const error = el('p', { class: 'error-text' });
+        const form = el('form', { class: 'form-row', onsubmit: async event => {
+            event.preventDefault();
+            try {
+                await sendJSON('/api/networks', 'POST', { cidr: cidr.value, name: name.value });
+                closePanel();
+                loadGraph();
+            } catch (e) {
+                error.textContent = e.message;
+            }
+        } }, cidr, name, el('button', { type: 'submit', class: 'btn', text: 'Name this network' }));
+        openPanel(group.label, facts(rows),
+            el('p', { class: 'hint', text: 'Grouped automatically by address. Give it a name, or widen it (for example to a /16), and it is used in every session.' }),
+            form, error, el('p', {}, el('a', { href: '/networks', text: 'Manage networks' })));
+        name.focus();
     }
 
     function showMergedPanel(node) {
@@ -381,6 +401,170 @@
         } catch (error) {
             openPanel(title, summary, el('p', { text: `Could not load flows: ${error.message}` }));
         }
+    }
+
+    // --- physical view
+
+    const PHYSICAL_COLORS = { switch: '#34495e', neighbor: '#7f8c8d', port: '#aab7c4', capture: '#e8743b' };
+    let physicalCy = null;
+    let physicalLoaded = false;
+
+    function physicalLayout() {
+        if (!physicalCy) return;
+        const count = physicalCy.nodes().filter(n => !n.isParent()).length;
+        physicalCy.layout(count > MAX_FORCE_LAYOUT_NODES
+            ? { name: 'grid', avoidOverlap: true }
+            : { name: forceLayoutName(), animate: false, nodeDimensionsIncludeLabels: true, idealEdgeLength: 90,
+                nodeRepulsion: 6000, packComponents: true }).run();
+        physicalCy.fit(undefined, 30);
+        if (physicalCy.zoom() > 1.2) {
+            physicalCy.zoom(1.2);
+            physicalCy.center();
+        }
+    }
+
+    async function loadPhysical() {
+        physicalLoaded = true;
+        const container = document.getElementById('cy-physical');
+        let data;
+        try {
+            data = await getJSON(`${API}/physical`);
+        } catch (error) {
+            container.textContent = `Could not load the physical view: ${error.message}`;
+            return;
+        }
+        renderSwitchList(data.switches);
+        const devices = data.nodes.filter(n => n.type === 'device').length;
+        setText('physical-summary', `${fmt(data.switches.length)} imported switches, ${fmt(devices)} devices`);
+        const parents = new Set(data.nodes.map(n => n.parent).filter(Boolean));
+        const nodes = data.nodes
+            .sort((a, b) => (parents.has(b.id) ? 1 : 0) - (parents.has(a.id) ? 1 : 0))  // parents first
+            .map(node => ({ data: {
+                id: node.id, label: node.label, parent: node.parent, kind: node.type, node,
+                color: node.type === 'device' ? (CATEGORY_COLORS[firstToken(node.category)] || UNCLASSIFIED_COLOR) : PHYSICAL_COLORS[node.type],
+                shape: node.type === 'device' && node.category === 'NETWORK_DEVICE' ? 'round-rectangle'
+                    : ({ port: 'rectangle', capture: 'star', neighbor: 'round-rectangle' }[node.type] || 'ellipse'),
+                faded: node.type === 'device' && !node.seen
+            } }));
+        const edges = data.edges.map((edge, i) => ({ data: { id: `pe${i}`, source: edge.source, target: edge.target, label: edge.label, kind: edge.type } }));
+        if (physicalCy) physicalCy.destroy();
+        container.textContent = '';
+        physicalCy = cytoscape({
+            container,
+            elements: nodes.concat(edges),
+            style: [
+                { selector: 'node', style: { 'label': 'data(label)', 'font-size': 10, 'text-wrap': 'wrap', 'text-max-width': 120,
+                                             'text-valign': 'bottom', 'text-margin-y': 4, 'background-color': 'data(color)',
+                                             'shape': 'data(shape)', 'width': 34, 'height': 34 } },
+                { selector: 'node[kind = "port"]', style: { 'width': 22, 'height': 14, 'font-size': 8, 'text-valign': 'center',
+                                                            'text-margin-y': 0, 'color': '#222' } },
+                { selector: 'node[kind = "capture"]', style: { 'width': 44, 'height': 44, 'font-weight': 'bold' } },
+                { selector: 'node[kind = "neighbor"]', style: { 'border-width': 2, 'border-style': 'dashed', 'border-color': '#555',
+                                                                'width': 60, 'height': 30 } },
+                { selector: 'node[?faded]', style: { 'opacity': 0.5 } },
+                { selector: ':parent', style: { 'background-color': '#eef3f8', 'background-opacity': 0.7, 'border-color': '#9fb3c8',
+                                                'border-width': 1, 'shape': 'round-rectangle', 'text-valign': 'top', 'font-size': 12,
+                                                'padding': 14, 'color': '#555' } },
+                { selector: 'node[kind = "switch"]:parent', style: { 'background-color': '#dfe6ee', 'border-color': '#34495e',
+                                                                     'border-width': 2, 'font-weight': 'bold', 'color': '#222' } },
+                { selector: 'edge', style: { 'width': 1, 'line-color': '#aaa', 'curve-style': 'bezier', 'label': 'data(label)',
+                                             'font-size': 8, 'color': '#555', 'text-rotation': 'autorotate' } },
+                { selector: 'edge[kind = "link"]', style: { 'width': 4, 'line-color': '#34495e' } },
+                { selector: 'edge[kind = "capture"]', style: { 'width': 3, 'line-color': '#e8743b', 'line-style': 'dashed' } },
+                { selector: '.selected', style: { 'border-width': 4, 'border-color': '#222', 'line-color': '#222' } }
+            ]
+        });
+        physicalLayout();
+        physicalCy.on('tap', 'node', event => {
+            const node = event.target.data('node');
+            physicalCy.elements().removeClass('selected');
+            event.target.addClass('selected');
+            if (node.type === 'device') showDevicePanel(node.mac);
+            else if (node.type === 'port') showPortPanel(node);
+            else if (node.type === 'switch') showSwitchPanel(node, data.switches);
+            else if (node.type === 'neighbor') {
+                openPanel(node.label, facts([['Platform', node.platform], ['Address', node.address]]),
+                    el('p', { class: 'hint', text: 'A CDP or LLDP neighbor of an imported switch. Import its own output to see what is plugged into it.' }));
+            } else if (node.type === 'capture') {
+                openPanel('Capture point', el('p', { text: 'Where this capture was taken. LLDP and CDP only travel one hop, so the device '
+                    + 'that sent them is on the other end of the capture\'s cable, and the port it announced is the one the capture is plugged into.' }));
+            }
+        });
+    }
+
+    function renderSwitchList(switches) {
+        const list = document.getElementById('switch-list');
+        list.replaceChildren(...(switches.length ? switches.map(sw => el('li', {},
+            el('span', {}, el('strong', { text: sw.name }), el('br'),
+               el('span', { class: 'hint', text: `${fmt(sw.ports)} ports, ${fmt(sw.macs)} MAC entries, ${fmt(sw.neighbors)} neighbors` })),
+            el('button', { class: 'link-btn danger', text: 'Remove', onclick: async () => {
+                if (!confirm(`Remove the imported data for ${sw.name}?`)) return;
+                await sendJSON(`${API}/switches/${sw.id}`, 'DELETE');
+                loadPhysical();
+                if (devicesTable.loaded) devicesTable.load();
+            } }))) : [el('li', { class: 'hint', text: 'None yet.' })]));
+    }
+
+    function showPortPanel(port) {
+        openPanel(`${port.switch} ${port.port}`, facts([['Description', port.description], ['Mode', port.mode],
+            [port.mode === 'trunk' ? 'Native VLAN' : 'VLAN', port.vlan], ['Shut down', port.shutdown ? 'yes' : null]]));
+    }
+
+    function showSwitchPanel(node, switches) {
+        const sw = switches.find(s => s.id === node.switch_id) || {};
+        openPanel(node.label, facts([['Imported from', sw.filename || 'pasted text'], ['Imported', sw.imported_at],
+            ['Ports in config', fmt(sw.ports)], ['MAC table entries', fmt(sw.macs)], ['Neighbors', fmt(sw.neighbors)]]),
+            el('p', { class: 'hint', text: 'Only ports with something plugged in, a neighbor or the capture are drawn.' }));
+    }
+
+    document.getElementById('switch-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const form = event.target;
+        const error = document.getElementById('switch-error');
+        error.textContent = '';
+        const button = form.querySelector('button');
+        button.disabled = true;
+        try {
+            await pyLot.request(`${API}/switches`, { method: 'POST', body: new FormData(form) });
+            form.reset();
+            await loadPhysical();
+            if (devicesTable.loaded) devicesTable.load();
+        } catch (e) {
+            error.textContent = e.message;
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    async function showDevicePanel(mac) {
+        openPanel(mac, el('p', { text: 'Loading…' }));
+        let device;
+        try {
+            device = await getJSON(`${API}/devices/${encodeURIComponent(mac)}`);
+        } catch (error) {
+            openPanel(mac, el('p', { text: `Could not load this device: ${error.message}` }));
+            return;
+        }
+        const properties = Object.entries(device.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
+        openPanel(device.name ? `${device.name} (${mac})` : mac,
+            facts([['Vendor', device.vendor], ['Switch port', device.switch ? `${device.switch} ${device.port}` : null],
+                   ['VLANs', device.vlans.join(', ')], ['Routes for', device.routes_for ? `${fmt(device.routes_for)} hosts on other networks` : null],
+                   ['Frames sent', device.seen ? fmt(device.packets) : 'Not seen in the capture, only in an imported MAC table'],
+                   ['First seen', when(device.first_seen)], ['Last seen', when(device.last_seen)]]),
+            device.ips.length ? el('h3', { text: 'IP addresses' }) : null,
+            device.ips.length ? el('p', {}, ...device.ips.flatMap((ip, i) => [i ? ', ' : null,
+                el('a', { href: '#', text: ip, onclick: event => { event.preventDefault(); showHostPanel(ip); } })])) : null,
+            properties.length ? el('h3', { text: 'Classification' }) : null,
+            properties.length ? table([{ key: 'name', label: 'Property' }, { key: 'values', label: 'Value' },
+                                       { key: 'confidence', label: 'Confidence', num: true }], properties) : null,
+            ...layer2Evidence(device.layer2_evidence),
+            device.switch_entries.length ? el('h3', { text: 'In imported MAC tables' }) : null,
+            device.switch_entries.length ? table([{ key: 'switch', label: 'Switch' }, { key: 'port', label: 'Port' },
+                                                  { key: 'vlan', label: 'VLAN', num: true }], device.switch_entries) : null,
+            device.l2_flows.length ? el('h3', { text: 'Layer-2 traffic (without IP)' }) : null,
+            device.l2_flows.length ? table([{ key: 'src_mac', label: 'From' }, { key: 'dst_mac', label: 'To' },
+                                            { key: 'protocol', label: 'Protocol' }, { key: 'packets', label: 'Frames', num: true, format: fmt },
+                                            { key: 'bytes', label: 'Bytes', num: true, format: fmt }], device.l2_flows) : null);
     }
 
     // --- host and flow tables
@@ -433,6 +617,7 @@
             }
             const rows = data[this.rowsKey];
             const head = el('tr', {}, ...this.columns.map(c => {
+                if (c.sortable === false) return el('th', { text: c.label });
                 const sorted = this.state.sort === c.key;
                 return el('th', { class: `sortable${sorted ? ' sorted' : ''}${sorted && this.state.order === 'desc' ? ' desc' : ''}`,
                                   text: c.label, onclick: () => this.sortBy(c) });
@@ -489,6 +674,21 @@
         ]
     });
 
+    const list = values => (values || []).join(', ');
+    const devicesTable = new PagedTable({
+        name: 'devices', endpoint: `${API}/devices`, rowsKey: 'devices', sort: 'mac', order: 'asc',
+        onRowClick: row => showDevicePanel(row.mac),
+        columns: [
+            { key: 'mac', label: 'MAC' }, { key: 'vendor', label: 'Vendor' }, { key: 'name', label: 'Name' },
+            { key: 'ips', label: 'IPs', sortable: false, format: list }, { key: 'vlans', label: 'VLANs', sortable: false, format: list },
+            { key: 'category', label: 'Category' }, { key: 'role', label: 'Role' },
+            { key: 'layer2', label: 'Layer-2 protocols', sortable: false, format: list },
+            { key: 'switch', label: 'Switch' }, { key: 'port', label: 'Port' },
+            { key: 'packets', label: 'Frames sent', num: true, format: fmt },
+            { key: 'last_seen', label: 'Last seen', num: true, format: when }
+        ]
+    });
+
     // --- tabs and controls
 
     function showTab(name) {
@@ -500,6 +700,11 @@
         }
         if (name === 'hosts' && !hostsTable.loaded) hostsTable.load();
         if (name === 'flows' && !flowsTable.loaded) flowsTable.load();
+        if (name === 'devices' && !devicesTable.loaded) devicesTable.load();
+        if (name === 'physical') {
+            if (!physicalLoaded) loadPhysical();
+            else if (physicalCy) physicalCy.resize();
+        }
     }
 
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
@@ -516,6 +721,8 @@
         loadGraph();
         if (hostsTable.loaded) hostsTable.load();
         if (flowsTable.loaded) flowsTable.load();
+        if (devicesTable.loaded) devicesTable.load();
+        if (physicalLoaded) loadPhysical();
     });
     document.getElementById('collapse-toggle').addEventListener('click', async event => {
         collapse = collapse === false ? true : false;
@@ -527,6 +734,11 @@
     });
     document.getElementById('export-png').addEventListener('click', () => {
         if (cy) download(cy.png({ full: true, scale: 2, bg: '#ffffff' }), `session_${SESSION_ID}_graph.png`);
+    });
+    document.getElementById('physical-fit').addEventListener('click', () => physicalCy && physicalCy.fit(undefined, 30));
+    document.getElementById('physical-relayout').addEventListener('click', physicalLayout);
+    document.getElementById('physical-png').addEventListener('click', () => {
+        if (physicalCy) download(physicalCy.png({ full: true, scale: 2, bg: '#ffffff' }), `session_${SESSION_ID}_physical.png`);
     });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closePanel(); });
 

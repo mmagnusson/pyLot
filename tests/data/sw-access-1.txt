@@ -1,0 +1,50 @@
+sw-access-1#show running-config
+Building configuration...
+
+Current configuration : 4120 bytes
+!
+hostname sw-access-1
+!
+interface GigabitEthernet1/0/1
+ description PLC line 1
+ switchport access vlan 10
+ switchport mode access
+!
+interface GigabitEthernet1/0/2
+ description HMI
+ switchport access vlan 10
+!
+interface GigabitEthernet1/0/3
+ shutdown
+!
+interface GigabitEthernet1/0/24
+ description Uplink to core
+ switchport trunk native vlan 99
+ switchport mode trunk
+!
+interface Vlan10
+ ip address 10.0.0.2 255.255.255.0
+!
+end
+
+sw-access-1#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+  10    000e.8c11.2233    DYNAMIC     Gi1/0/1
+  10    0050.0493.7067    DYNAMIC     Gi1/0/2
+  10    001b.54cc.dd01    DYNAMIC     Gi1/0/24
+  10    0002.b3ce.7051    DYNAMIC     Gi1/0/24
+Total Mac Addresses for this criterion: 5
+
+sw-access-1#show cdp neighbors detail
+-------------------------
+Device ID: sw-core-1.plant.local
+Entry address(es):
+  IP address: 10.0.0.1
+Platform: cisco WS-C3850-24T,  Capabilities: Router Switch IGMP
+Interface: GigabitEthernet1/0/24,  Port ID (outgoing port): GigabitEthernet1/0/1
+Holdtime : 155 sec

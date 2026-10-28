@@ -2,6 +2,7 @@ from flask import Flask, Response, render_template, request, redirect, url_for, 
 from werkzeug.utils import secure_filename
 from parser.packets import check_capture
 from parser.pcap_parser import parse_pcap
+from parser import switch_config
 from capture import live_capture
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
@@ -25,6 +26,7 @@ LOOPBACK_HOSTS = ('127.0.0.1', 'localhost')
 CAPTURE_MAGIC_NUMBERS = (b'\xd4\xc3\xb2\xa1', b'\xa1\xb2\xc3\xd4', b'\x4d\x3c\xb2\xa1', b'\xa1\xb2\x3c\x4d', b'\x0a\x0d\x0d\x0a')
 MAX_PAGE_SIZE = 1000
 MAX_CAPTURE_FILTER_LENGTH = 500
+MAX_SWITCH_FILE_BYTES = 5 * 1024 * 1024
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -232,6 +234,135 @@ def session_flows(session_id):
                                           host=request.args.get('host'), src=request.args.get('src'), dst=request.args.get('dst'))
     return jsonify({'flows': flows, 'total': total})
 
+@app.route('/api/sessions/<int:session_id>/devices')
+def session_devices(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        paging = _paging()
+        devices, total = storage.list_devices(conn, session_id, **{**paging, 'sort': paging['sort'] or 'mac'})
+    return jsonify({'devices': devices, 'total': total})
+
+@app.route('/api/sessions/<int:session_id>/devices/<mac>')
+def session_device(session_id, mac):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        device = storage.device_detail(conn, session_id, mac.lower())
+    if device is None:
+        abort(404)
+    return jsonify(device)
+
+@app.route('/api/sessions/<int:session_id>/physical')
+def session_physical(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        return jsonify(storage.physical_graph(conn, session_id))
+
+@app.route('/api/sessions/<int:session_id>/switches', methods=['POST'])
+def import_switch(session_id):
+    """Import Cisco show running-config / mac address-table / cdp or lldp neighbors output, uploaded or pasted."""
+    with db() as conn:
+        session = _session_or_404(conn, session_id)
+        file = request.files.get('config_file')
+        if file and file.filename:
+            raw = file.stream.read(MAX_SWITCH_FILE_BYTES + 1)
+            filename = secure_filename(file.filename)[:200] or 'switch.txt'
+        else:
+            raw = request.form.get('config_text', '').encode()
+            filename = None
+        if len(raw) > MAX_SWITCH_FILE_BYTES:
+            return jsonify({'error': f'Switch files can be at most {MAX_SWITCH_FILE_BYTES // (1024 * 1024)} MB.'}), 400
+        if b'\x00' in raw:
+            return jsonify({'error': 'That is not a text file of switch command output.'}), 400
+        data = switch_config.parse(raw.decode('utf-8', 'replace'))
+        if data.is_empty():
+            return jsonify({'error': 'No interfaces, MAC address table or CDP/LLDP neighbors found. pyLot reads the output of '
+                                     'show running-config, show mac address-table and show cdp/lldp neighbors detail.'}), 400
+        name = request.form.get('name', '').strip() or None
+        switch_id = storage.save_switch(conn, session['id'], data, filename=filename, name=name)
+        switch = next(s for s in storage.list_switches(conn, session_id) if s['id'] == switch_id)
+    return jsonify(switch), 201
+
+@app.route('/api/sessions/<int:session_id>/switches/<int:switch_id>', methods=['DELETE'])
+def remove_switch(session_id, switch_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        if not storage.delete_switch(conn, session_id, switch_id):
+            abort(404)
+    return '', 204
+
+@app.route('/sessions/<int:session_id>/compare')
+def compare_view(session_id):
+    with db() as conn:
+        session = _session_or_404(conn, session_id)
+        sessions = [s for s in storage.list_sessions(conn) if s['id'] != session_id]
+    return render_template('compare.html', session=session, sessions=sessions,
+                           baseline_id=request.args.get('baseline', type=int))
+
+@app.route('/api/sessions/<int:session_id>/compare')
+def compare_sessions(session_id):
+    baseline_id = request.args.get('baseline', type=int)
+    with db() as conn:
+        session = _session_or_404(conn, session_id)
+        baseline = storage.get_session(conn, baseline_id) if baseline_id else None
+        if baseline is None:
+            return jsonify({'error': 'Choose a baseline session to compare with.'}), 400
+        return jsonify({'session': session, 'baseline': baseline, **storage.compare_sessions(conn, session_id, baseline_id)})
+
+# --- named networks and settings
+
+@app.route('/networks')
+def networks_view():
+    return render_template('networks.html')
+
+def _json_body():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        abort(400)
+    return body
+
+@app.route('/api/networks')
+def networks_list():
+    with db() as conn:
+        return jsonify({'networks': storage.list_networks(conn), 'settings': storage.get_settings(conn)})
+
+@app.route('/api/networks', methods=['POST'])
+def networks_add():
+    body = _json_body()
+    with db() as conn:
+        try:
+            network = storage.add_network(conn, body.get('cidr', ''), body.get('name'))
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+    return jsonify(network), 201
+
+@app.route('/api/networks/<int:network_id>', methods=['PUT'])
+def networks_update(network_id):
+    body = _json_body()
+    with db() as conn:
+        try:
+            network = storage.update_network(conn, network_id, cidr=body.get('cidr'), name=body.get('name'))
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+    if network is None:
+        abort(404)
+    return jsonify(network)
+
+@app.route('/api/networks/<int:network_id>', methods=['DELETE'])
+def networks_delete(network_id):
+    with db() as conn:
+        if not storage.delete_network(conn, network_id):
+            abort(404)
+    return '', 204
+
+@app.route('/api/settings', methods=['PUT'])
+def settings_update():
+    body = _json_body()
+    with db() as conn:
+        try:
+            return jsonify(storage.update_settings(conn, **body))
+        except (ValueError, TypeError) as e:
+            return jsonify({'error': str(e)}), 400
+
 HOST_CSV_COLUMNS = ['ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'packets_sent', 'packets_received',
                     'bytes_sent', 'bytes_received', 'first_seen', 'last_seen', 'fingerprints']
 FLOW_CSV_COLUMNS = ['src', 'dst', 'transport', 'src_port', 'dst_port', 'protocol', 'packets', 'bytes', 'first_seen', 'last_seen']
@@ -257,6 +388,18 @@ def export_flows(session_id):
         _session_or_404(conn, session_id)
         flows, _ = storage.list_flows(conn, session_id)
     return _csv(flows, FLOW_CSV_COLUMNS, f'session_{session_id}_flows.csv')
+
+DEVICE_CSV_COLUMNS = ['mac', 'vendor', 'name', 'ips', 'vlans', 'category', 'role', 'layer2', 'switch', 'port', 'seen',
+                      'packets', 'bytes', 'first_seen', 'last_seen']
+
+@app.route('/sessions/<int:session_id>/devices.csv')
+def export_devices(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        devices, _ = storage.list_devices(conn, session_id)
+    rows = [{**d, 'ips': '; '.join(d['ips']), 'vlans': '; '.join(map(str, d['vlans'])), 'layer2': '; '.join(d['layer2'])}
+            for d in devices]
+    return _csv(rows, DEVICE_CSV_COLUMNS, f'session_{session_id}_devices.csv')
 
 @app.route('/api/interfaces')
 def interfaces():
