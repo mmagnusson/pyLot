@@ -274,6 +274,16 @@ def session_flows(session_id):
                                           host=request.args.get('host'), src=request.args.get('src'), dst=request.args.get('dst'))
     return jsonify({'flows': flows, 'total': total})
 
+@app.route('/api/sessions/<int:session_id>/operations')
+def session_operations(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        paging = _paging()
+        operations, total = storage.list_operations(conn, session_id, **{**paging, 'sort': paging['sort'] or 'kind'},
+                                                    host=request.args.get('host'), kind=request.args.get('kind') or None)
+        kinds = storage.operation_kinds(conn, session_id)
+    return jsonify({'operations': operations, 'total': total, 'kinds': kinds})
+
 @app.route('/api/sessions/<int:session_id>/devices')
 def session_devices(session_id):
     with db() as conn:
@@ -403,16 +413,23 @@ def settings_update():
         except (ValueError, TypeError) as e:
             return jsonify({'error': str(e)}), 400
 
-HOST_CSV_COLUMNS = ['ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'packets_sent', 'packets_received',
-                    'bytes_sent', 'bytes_received', 'first_seen', 'last_seen', 'fingerprints']
+HOST_CSV_COLUMNS = ['ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'device_vendor', 'model', 'firmware', 'serial',
+                    'packets_sent', 'packets_received', 'bytes_sent', 'bytes_received', 'first_seen', 'last_seen', 'fingerprints']
 FLOW_CSV_COLUMNS = ['src', 'dst', 'transport', 'src_port', 'dst_port', 'protocol', 'packets', 'bytes', 'first_seen', 'last_seen']
+
+def _cell(value):
+    # Names and banners come from captured traffic: don't let a spreadsheet run one as a formula
+    if isinstance(value, str) and value[:1] in ('=', '+', '-', '@', '\t', '\r'):
+        return "'" + value
+    return value
 
 def _csv(rows, columns, filename):
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=columns, extrasaction='ignore')
     writer.writeheader()
     for row in rows:
-        writer.writerow({**row, 'fingerprints': '; '.join(row.get('fingerprints', []))} if 'fingerprints' in columns else row)
+        row = {**row, 'fingerprints': '; '.join(row.get('fingerprints', []))} if 'fingerprints' in columns else row
+        writer.writerow({key: _cell(value) for key, value in row.items()})
     return Response(out.getvalue(), mimetype='text/csv', headers={'Content-Disposition': f'attachment; filename={filename}'})
 
 @app.route('/sessions/<int:session_id>/hosts.csv')
@@ -429,8 +446,17 @@ def export_flows(session_id):
         flows, _ = storage.list_flows(conn, session_id)
     return _csv(flows, FLOW_CSV_COLUMNS, f'session_{session_id}_flows.csv')
 
-DEVICE_CSV_COLUMNS = ['mac', 'vendor', 'name', 'ips', 'vlans', 'category', 'role', 'layer2', 'switch', 'port', 'seen',
-                      'packets', 'bytes', 'first_seen', 'last_seen']
+OPERATION_CSV_COLUMNS = ['src', 'dst', 'protocol', 'operation', 'kind', 'count', 'first_seen', 'last_seen', 'first_frame']
+
+@app.route('/sessions/<int:session_id>/operations.csv')
+def export_operations(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        operations, _ = storage.list_operations(conn, session_id)
+    return _csv(operations, OPERATION_CSV_COLUMNS, f'session_{session_id}_operations.csv')
+
+DEVICE_CSV_COLUMNS = ['mac', 'vendor', 'name', 'ips', 'vlans', 'category', 'role', 'model', 'firmware', 'serial', 'layer2',
+                      'switch', 'port', 'seen', 'packets', 'bytes', 'first_seen', 'last_seen']
 
 @app.route('/sessions/<int:session_id>/devices.csv')
 def export_devices(session_id):

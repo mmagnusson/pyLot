@@ -310,3 +310,65 @@ def test_reanalyze_all(client, monkeypatch):
     assert [args[0] for args in queued] == [1, 2] and all(args[2] is False for args in queued)
     assert {s['status'] for s in (client.get(f'/api/sessions/{i}').get_json() for i in (1, 2))} == {'processing'}
     assert 'Re-analyze all uploads' in client.get('/').get_data(as_text=True)
+
+# --- industrial operations and identity
+
+def ics_pcap(firmware=(20, 11)):
+    from packet_builder import enip_list_identity_reply, modbus_adu, udp_frame
+    return pcap_bytes([
+        tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, modbus_adu(6, b'\x00\x01\x00\x2a'), seq=100),
+        tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, modbus_adu(3, b'\x00\x00\x00\x01', transaction=2), seq=112),
+        udp_frame('10.0.0.3', '10.0.0.57', 44818, 2000, enip_list_identity_reply(revision=firmware, name='1756-L71=SUM(A1)')),
+    ])
+
+def test_operations_api_lists_writes_first_and_filters(client):
+    upload(client, data=ics_pcap())
+    data = client.get('/api/sessions/1/operations').get_json()
+    assert [(o['operation'], o['kind']) for o in data['operations']] == [('Write Single Register', 'write'),
+                                                                         ('Read Holding Registers', 'read')]
+    assert data['kinds'] == {'write': 1, 'read': 1}
+    assert client.get('/api/sessions/1/operations?kind=read').get_json()['total'] == 1
+    assert client.get('/api/sessions/1/operations?q=holding').get_json()['total'] == 1
+    edge = next(e for e in client.get('/api/sessions/1/graph').get_json()['edges'] if e['source'] == '10.0.0.57')
+    assert edge['operations'] == ['read', 'write']
+
+def test_host_detail_has_identity_and_operations(client):
+    upload(client, data=ics_pcap())
+    host = client.get('/api/sessions/1/hosts/10.0.0.3').get_json()
+    assert (host['model'], host['firmware'], host['serial']) == ('1756-L71=SUM(A1)', '20.011', '0x00ABCDEF')
+    assert host['device_vendor'] == 'Rockwell Automation/Allen-Bradley'
+    assert host['operation_count'] == 2 and host['operations'][0]['operation'] == 'Write Single Register'
+    assert client.get('/api/sessions/1/hosts?sort=firmware').status_code == 200
+
+def test_csv_exports_include_operations_and_disarm_formulas(client):
+    upload(client, data=ics_pcap())
+    operations = client.get('/sessions/1/operations.csv').data.decode()
+    assert operations.splitlines()[0] == 'src,dst,protocol,operation,kind,count,first_seen,last_seen,first_frame'
+    assert 'Write Single Register,write' in operations
+    hosts = client.get('/sessions/1/hosts.csv').data.decode()
+    assert "'1756-L71=SUM(A1)" not in hosts and '1756-L71=SUM(A1)' in hosts  # only a leading = is a formula
+
+def test_compare_reports_new_operations_and_firmware_changes(client):
+    from packet_builder import enip_list_identity_reply, modbus_adu, udp_frame
+    upload(client, data=pcap_bytes([
+        tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, modbus_adu(3, b'\x00\x00\x00\x01')),
+        udp_frame('10.0.0.3', '10.0.0.57', 44818, 2000, enip_list_identity_reply(revision=(20, 11)))]), name='before.pcap')
+    upload(client, data=ics_pcap(firmware=(21, 3)), name='after.pcap')
+    diff = client.get('/api/sessions/2/compare?baseline=1').get_json()
+    assert [(o['operation'], o['kind']) for o in diff['new_operations']['items']] == [('Write Single Register', 'write')]
+    changes = {c['what']: (c['before'], c['now']) for c in diff['changed_hosts']['items'][0]['changes']}
+    assert changes == {'Firmware': ('20.011', '21.003'), 'Model': ('1756-L71/B LOGIX5571', '1756-L71=SUM(A1)'),
+                       'Product': ('1756-L71/B LOGIX5571', '1756-L71=SUM(A1)')}
+
+def test_identity_heard_in_only_one_session_is_not_a_change(client):
+    from packet_builder import modbus_adu
+    upload(client, data=pcap_bytes([tcp_frame('10.0.0.57', '10.0.0.3', 2578, 502, modbus_adu(3, b'\x00\x00\x00\x01'))]))
+    upload(client, data=ics_pcap())
+    diff = client.get('/api/sessions/2/compare?baseline=1').get_json()
+    assert not any(c['what'] in ('Firmware', 'Product', 'Serial') for h in diff['changed_hosts']['items'] for c in h['changes'])
+
+def test_reanalyze_clears_operations(client):
+    upload(client, data=ics_pcap())
+    with storage.connect(app_module.DB_PATH) as conn:
+        assert storage.reset_analysis(conn, 1)
+        assert storage.list_operations(conn, 1)[1] == 0

@@ -75,3 +75,21 @@ def test_only_dirty_rows_are_returned_after_a_save():
     analyzer.add(packet(dst_port=20000))
     assert [row[4] for row in analyzer.flow_rows(only_dirty=True)] == [20000]
     assert len(analyzer.flow_rows()) == 2
+
+def test_decoded_operations_are_counted_and_saved_incrementally():
+    from packet_builder import modbus_adu
+    analyzer = CaptureAnalyzer(engine=_NoFingerprints())
+    write = packet(src='10.0.0.5', dst='10.0.0.20', src_port=50000, dst_port=502, payload=modbus_adu(6, b'\x00\x01\x00\x2a'))
+    analyzer.add(write)
+    analyzer.add(write)
+    [row] = analyzer.operation_rows()
+    assert row[:6] == ('10.0.0.5', '10.0.0.20', 'Modbus', 'Write Single Register', 'write', 2)
+    analyzer.clear_dirty()
+    assert analyzer.operation_rows(only_dirty=True) == []
+    analyzer.add(packet(src='10.0.0.5', dst='10.0.0.20', src_port=50000, dst_port=502, payload=modbus_adu(3, b'\x00\x00\x00\x01')))
+    assert [r[3] for r in analyzer.operation_rows(only_dirty=True)] == ['Read Holding Registers']
+    assert ('10.0.0.20', 'Modbus decoder', 'Role', 'SLAVE') in {e[:4] for e in analyzer.evidence_rows()}
+
+class _NoFingerprints:
+    def evaluate(self, pkt):
+        return []

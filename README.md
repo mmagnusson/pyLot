@@ -10,6 +10,14 @@ Python web application.
 - Live capture from a network interface, started and stopped from the web page, saved as its own session
 - Classifies hosts with GRASSMARLIN's fingerprint engine and its 118 stock fingerprints (Modbus,
   DNP3, BACnet, EtherNet/IP, S7, IEC 60870-5-104, PROFINET, vendor-specific protocols and more)
+- Decodes industrial protocols to list what each client asks each device to do: Modbus/TCP (with
+  Schneider UMAS), DNP3, S7comm, EtherNet/IP and CIP (including Logix tag services), IEC 60870-5-104,
+  BACnet/IP and SNMP. Program downloads, PLC stop and start, control commands and writes are listed
+  first and drawn in red or orange on the graph
+- Asset identity: vendor, model, order number, firmware and serial number from the identification
+  replies devices send (Modbus Read Device Identification, EtherNet/IP List Identity and Identity
+  object, S7 module and component identification, BACnet device properties), plus SNMP system
+  descriptions and HTTP, FTP and SSH server banners
 - Loads fingerprints in GRASSMARLIN's own XML format as well as the YAML conversions in `fingerprints/`
 - Hosts, flows, MAC addresses and ARP bindings, with MAC vendor lookup that doesn't credit a
   router's MAC to the remote hosts behind it
@@ -22,8 +30,8 @@ Python web application.
   classify devices, including ones that never send IP traffic
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
   see which device is plugged into which port, how switches connect, and where the capture was taken
-- Baseline comparison: new and missing hosts, MAC addresses and conversations, and hosts whose MAC or
-  classification changed since a known-good capture, listed on a comparison page and marked on the graph
+- Baseline comparison: new and missing hosts, MAC addresses and conversations, new industrial
+  operations, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
   and CSV exports
 
@@ -74,7 +82,10 @@ Python web application.
      confidence (1 is high, 5 is low, as in GRASSMARLIN)
    - The Logical tab is the IP network graph and the Physical tab the switch-level view. Hosts lists
      every IP address, Devices every MAC address (including devices that never sent IP traffic) and
-     Flows every conversation
+     Flows every conversation. Operations lists the industrial operations decoded from the traffic,
+     most consequential first, with a filter by kind (program, control, write, read and so on)
+   - A host's panel starts with its identity, as the device reported it, when the capture includes
+     an identification reply
 
    Uploaded files are kept, so a session can be analyzed again with Re-analyze on its page, or every
    upload at once with "Re-analyze all uploads" on the sessions list. Do this after updating pyLot or
@@ -104,11 +115,32 @@ Python web application.
    graph instead, pick the baseline under "Changes since" on the Logical tab: new hosts and
    conversations are drawn in green, changed hosts in orange.
 
+### Industrial operations and identity
+
+Each operation is listed under the conversation's client and server, with how many times it was
+seen and when, and a kind that says what it does to the server: **program** (downloads, uploads,
+block changes), **control** (PLC stop and start, DNP3 operate and restarts, IEC 104 commands, CIP
+reset), **write**, **read**, **diagnostic** (identification, status and discovery), **data**
+(values the server reports on its own), **session**, **error** (exceptions and failed requests) and
+**other**. Errors and reported data are listed under the conversation they belong to.
+
+Decoders check a message parses as its protocol before reporting anything, so other traffic on the
+same ports is ignored. TCP streams are reassembled, so messages split across segments are decoded and
+retransmissions aren't counted twice. Roles from decoded traffic (Modbus master, S7 server and so on)
+have confidence 2, ahead of the fingerprints' guesses, and what a device says about itself has
+confidence 1. A CIP identity reply that came through a chassis backplane (Unconnected Send to a slot)
+describes that module, so it is listed under Modules rather than as the address's own identity.
+
+Identity only appears when the capture includes a device answering an identification request, for
+example an engineering tool going online, an asset inventory scan, or EtherNet/IP and BACnet
+discovery broadcasts. A baseline comparison only reports a model or firmware change when both
+captures heard that device's identity.
+
 ### Zeek logs
 
 pyLot reads Zeek's `conn.log`, in the default tab-separated format or as JSON lines, and either one
-gzipped. Zeek records connections rather than packets, so fingerprints, which need packet payloads,
-don't run on them. Instead, hosts are classified from the service Zeek identified, for the industrial
+gzipped. Zeek records connections rather than packets, so fingerprints and the protocol decoders, which need
+packet payloads, don't run on them, and Zeek sessions have no operations or identity. Instead, hosts are classified from the service Zeek identified, for the industrial
 protocols its analyzers and CISA's ICSNPP plugins recognize (Modbus, DNP3, EtherNet/IP, BACnet, S7,
 IEC 104 and others). MAC addresses are used when Zeek logged them, which it does when the
 `policy/protocols/conn/mac-logging` script is loaded. Other Zeek logs (`dns.log`, `http.log` and so on)
@@ -150,7 +182,8 @@ The application uses SQLite (`pylot.sqlite3`) to store:
 - **hosts**: each IP address, with its MAC and vendor when it's on the captured segment, or the
   router MAC it was reached through when it isn't
 - **flows**: traffic between two hosts per protocol and port pair, with packet and byte counts
-- **evidence**: every fingerprint result for a host, with its confidence
+- **evidence**: every fingerprint result and decoded property (role, identity) for a host, with its confidence
+- **operations**: decoded industrial operations per client, server and protocol, with their kind and counts
 - **mac_addresses**, **arp_bindings**, **mac_vlans**: layer-2 observations
 - **l2_flows** and **mac_evidence**: traffic without IP, and what layer-2 protocols say about each MAC
 - **switches**, **switch_ports**, **switch_macs**, **switch_neighbors**: imported switch data, per session
@@ -168,6 +201,8 @@ The database is automatically created on first run.
   (`ip link` lists them)
 - **A session shows out-of-date results** (after updating pyLot or its fingerprints): use Re-analyze.
   Live captures aren't saved to a file, so they can't be re-analyzed
+- **No identity shown for a PLC**: devices only report their model and firmware when asked. Capture
+  while an engineering tool connects to them, or while EtherNet/IP or BACnet discovery runs
 - **Upload fails**: The error is shown on the upload page; details are in the server log. For Zeek,
   upload `conn.log` itself, not another log or a directory archive
 - **400 Bad Request when browsing by hostname or IP**: Add that name to `PYLOT_TRUSTED_HOSTS`
@@ -189,6 +224,7 @@ The application structure:
 - `parser/reference/`: vendor and device name tables for fingerprint lookups
 - `parser/analysis.py`: hosts, flows and evidence for one capture
 - `parser/layer2.py`: LLDP, CDP, STP and industrial Ethernet decoding
+- `parser/ics/`: industrial protocol decoders (one module per protocol) and TCP reassembly for them
 - `parser/switch_config.py`: Cisco switch output parsing for the physical view
 - `parser/mac_lookup.py`, `parser/oui.csv`: MAC vendor lookup (see `README_vendor_enrichment.md`)
 - `parser/protocols.py`: flow labels by well-known port

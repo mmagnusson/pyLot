@@ -18,6 +18,10 @@
     const MAX_FORCE_LAYOUT_NODES = 1500;
     const MAX_EDGE_LABELS = 150;
     const PAGE_SIZE = 100;
+    // Connections that carried industrial operations changing a device: program and control first, then writes
+    const IMPACT_COLORS = { program: '#c0392b', control: '#c0392b', write: '#e8743b' };
+    const KIND_LABELS = { program: 'Program', control: 'Control', write: 'Write', read: 'Read', diagnostic: 'Diagnostic',
+                          data: 'Data', session: 'Session', error: 'Error', other: 'Other' };
 
     let cy = null;
     let collapse = null;  // null lets the server decide whether to merge hosts behind routers
@@ -165,15 +169,18 @@
             if (!large && node.group) item.parent = `group:${node.group}`;
             return { data: item };
         });
-        const edges = data.edges.map(edge => ({
-            data: {
+        const impacts = new Set();
+        const edges = data.edges.map(edge => {
+            const impact = ['program', 'control', 'write'].find(kind => edge.operations.includes(kind)) || '';
+            if (impact) impacts.add(impact === 'write' ? 'write' : 'program');
+            return { data: {
                 id: `${edge.source}>${edge.target}`, source: edge.source, target: edge.target, edge,
                 label: showEdgeLabels ? edge.protocols.slice(0, 3).join(', ') + (edge.protocols.length > 3 ? '…' : '') : '',
                 width: Math.min(1 + Math.log10(1 + edge.bytes) / 1.5, 8),
-                search: edge.protocols.join(' ').toLowerCase() + (edge.new ? ' new' : ''),
-                isNew: !!edge.new
-            }
-        }));
+                search: [...edge.protocols, ...edge.operations].join(' ').toLowerCase() + (edge.new ? ' new' : ''),
+                isNew: !!edge.new, impact, impactColor: IMPACT_COLORS[impact] || '#999'
+            } };
+        });
 
         const legend = document.getElementById('legend');
         legend.replaceChildren();
@@ -182,6 +189,12 @@
             item.style.setProperty('--swatch', CATEGORY_COLORS[category] || UNCLASSIFIED_COLOR);
             legend.append(item);
         });
+        for (const [kind, text] of [['program', 'Program or control operations'], ['write', 'Write operations']]) {
+            if (!impacts.has(kind)) continue;
+            const item = el('span', { class: 'line-swatch', text });
+            item.style.setProperty('--swatch', IMPACT_COLORS[kind]);
+            legend.append(item);
+        }
         if (data.baseline) {
             const b = data.baseline;
             for (const [text, color] of [['New since baseline', '#1e9e4a'], ['Changed since baseline', '#f0ad4e']]) {
@@ -223,6 +236,7 @@
                 { selector: 'edge', style: { 'label': 'data(label)', 'width': 'data(width)', 'line-color': '#999',
                                              'target-arrow-shape': 'triangle', 'target-arrow-color': '#999', 'curve-style': 'bezier',
                                              'font-size': 9, 'text-rotation': 'autorotate', 'color': '#444' } },
+                { selector: 'edge[impact != ""]', style: { 'line-color': 'data(impactColor)', 'target-arrow-color': 'data(impactColor)' } },
                 { selector: 'node[change = "new"]', style: { 'border-width': 5, 'border-color': '#1e9e4a' } },
                 { selector: 'node[change = "changed"]', style: { 'border-width': 5, 'border-color': '#f0ad4e' } },
                 { selector: 'edge[?isNew]', style: { 'line-color': '#1e9e4a', 'target-arrow-color': '#1e9e4a' } },
@@ -253,6 +267,7 @@
             const lines = host.merged ? [`${host.merged} hosts reached via router ${host.via_mac}`,
                                          host.new_hosts ? `${host.new_hosts} new since the baseline` : null]
                 : [host.ip, host.vendor ? `${host.mac} (${host.vendor})` : host.mac, [host.category, host.role].filter(Boolean).join(' '),
+                   [host.model, host.firmware && `firmware ${host.firmware}`].filter(Boolean).join(', '),
                    host.change === 'new' ? 'New since the baseline' : null,
                    ...(host.changes || []).map(c => `${c.what}: ${c.before || 'none'} → ${c.now || 'none'}`)];
             showTooltip(event, lines.filter(Boolean).join('\n') + '\nClick for details');
@@ -344,6 +359,7 @@
         const properties = Object.entries(host.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(ip,
             ...baselineChanges(ip),
+            ...identitySection(host),
             facts([['Network', host.network], ['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
                    ['Address type', host.kind === 'unicast' ? null : host.kind],
                    ['ARP', host.arp.map(a => a.mac).join(', ')],
@@ -365,10 +381,41 @@
             ...layer2Evidence(host.layer2_evidence),
             host.mac ? el('p', {}, el('a', { href: '#', text: `Layer-2 details for ${host.mac}`,
                                             onclick: event => { event.preventDefault(); showDevicePanel(host.mac); } })) : null,
+            ...operationsSection(host.operations, host.operation_count, ip),
             el('h3', { text: `Flows (${host.flows.length < host.flow_count ? `busiest ${host.flows.length} of ${fmt(host.flow_count)}` : fmt(host.flow_count)})` }),
             table(PANEL_FLOW_COLUMNS, host.flows),
             el('p', {}, el('a', { href: '#', text: 'Show all of its flows in the Flows tab',
                                   onclick: event => { event.preventDefault(); closePanel(); flowsTable.setHost(ip); showTab('flows'); } })));
+    }
+
+    // What the device said about itself when asked (decoded identity replies), as one block
+    const IDENTITY_FIELDS = [['Vendor', 'Vendor'], ['Model', 'Model'], ['Product', 'Product'], ['Order number', 'OrderNumber'],
+                             ['Device type', 'DeviceType'], ['Firmware', 'Firmware'], ['Software', 'Software'], ['Serial number', 'Serial'],
+                             ['Name', 'Name'], ['Module name', 'ModuleName'], ['Plant ID', 'PlantID'], ['Location', 'Location'],
+                             ['Modules', 'Module'], ['Description', 'SystemDescription'], ['Web server', 'HTTPServer'],
+                             ['FTP server', 'FTPBanner'], ['SSH server', 'SSHServer']];
+
+    function identitySection(item) {
+        const rows = IDENTITY_FIELDS.map(([label, name]) => [label, (item.properties[name] || { values: [] }).values.join('; ')])
+            .filter(([, value]) => value);
+        if (!rows.length) return [];
+        return [el('h3', { text: 'Identity' }), facts(rows),
+                el('p', { class: 'hint', text: 'As the device reported it in the capture, for example in an identification reply or a service banner.' })];
+    }
+
+    const kindBadge = kind => el('span', { class: `kind kind-${kind}`, text: KIND_LABELS[kind] || kind });
+    const OPERATION_COLUMNS = [
+        { key: 'src', label: 'Client' }, { key: 'dst', label: 'Server' }, { key: 'protocol', label: 'Protocol' },
+        { key: 'operation', label: 'Operation' }, { key: 'kind', label: 'Kind', format: kindBadge },
+        { key: 'count', label: 'Count', num: true, format: fmt }
+    ];
+
+    function operationsSection(operations, total, ip) {
+        if (!operations || !operations.length) return [];
+        return [el('h3', { text: `Industrial operations (${operations.length < total ? `${operations.length} of ${fmt(total)}` : fmt(total)})` }),
+                table(OPERATION_COLUMNS, operations),
+                ip ? el('p', {}, el('a', { href: '#', text: 'Show them in the Operations tab',
+                                           onclick: event => { event.preventDefault(); closePanel(); operationsTable.setHost(ip); showTab('operations'); } })) : null];
     }
 
     function layer2Evidence(evidence) {
@@ -422,7 +469,9 @@
     }
 
     async function showEdgePanel(edge) {
-        const summary = facts([['Protocols', edge.protocols.join(', ')], ['Flows', fmt(edge.flows)], ['Packets', fmt(edge.packets)],
+        const summary = facts([['Protocols', edge.protocols.join(', ')],
+                               ['Operations', edge.operations.map(kind => KIND_LABELS[kind] || kind).join(', ')],
+                               ['Flows', fmt(edge.flows)], ['Packets', fmt(edge.packets)],
                                ['Bytes', fmt(edge.bytes)], ['First seen', when(edge.first_seen)], ['Last seen', when(edge.last_seen)]]);
         const title = `${edge.source} → ${edge.target}`;
         if (edge.source.startsWith('via:') || edge.target.startsWith('via:')) {
@@ -432,7 +481,13 @@
         openPanel(title, summary, el('p', { text: 'Loading flows…' }));
         try {
             const data = await getJSON(`${API}/flows?src=${encodeURIComponent(edge.source)}&dst=${encodeURIComponent(edge.target)}&limit=${PAGE_SIZE}`);
-            openPanel(title, summary, el('h3', { text: `Flows (${data.flows.length < data.total ? `busiest ${data.flows.length} of ${fmt(data.total)}` : fmt(data.total)})` }),
+            const operations = edge.operations.length
+                ? (await getJSON(`${API}/operations?host=${encodeURIComponent(edge.source)}&limit=${PAGE_SIZE}`)).operations
+                    .filter(o => o.src === edge.source && o.dst === edge.target)
+                : [];
+            openPanel(title, summary,
+                      ...operationsSection(operations, operations.length),
+                      el('h3', { text: `Flows (${data.flows.length < data.total ? `busiest ${data.flows.length} of ${fmt(data.total)}` : fmt(data.total)})` }),
                       table(PANEL_FLOW_COLUMNS, data.flows));
         } catch (error) {
             openPanel(title, summary, el('p', { text: `Could not load flows: ${error.message}` }));
@@ -623,9 +678,9 @@
     // --- host and flow tables
 
     class PagedTable {
-        constructor({ name, endpoint, rowsKey, columns, sort, order, onRowClick }) {
-            Object.assign(this, { name, endpoint, rowsKey, columns, onRowClick });
-            this.state = { q: '', sort, order, offset: 0, host: null };
+        constructor({ name, endpoint, rowsKey, columns, sort, order, onRowClick, hostLabel = 'flows', onLoad }) {
+            Object.assign(this, { name, endpoint, rowsKey, columns, onRowClick, hostLabel, onLoad });
+            this.state = { q: '', sort, order, offset: 0, host: null, kind: '' };
             this.loaded = false;
             this.container = document.getElementById(`${name}-table`);
             this.pager = document.getElementById(`${name}-pager`);
@@ -652,7 +707,7 @@
             const chip = document.getElementById(`${this.name}-host`);
             if (chip) {
                 chip.classList.toggle('hidden', !host);
-                document.getElementById(`${this.name}-host-label`).textContent = host ? `Only flows to or from ${host}` : '';
+                document.getElementById(`${this.name}-host-label`).textContent = host ? `Only ${this.hostLabel} to or from ${host}` : '';
             }
         }
 
@@ -661,6 +716,7 @@
             const params = new URLSearchParams({ q: this.state.q, sort: this.state.sort, order: this.state.order,
                                                  offset: this.state.offset, limit: PAGE_SIZE });
             if (this.state.host) params.set('host', this.state.host);
+            if (this.state.kind) params.set('kind', this.state.kind);
             let data;
             try {
                 data = await getJSON(`${this.endpoint}?${params}`);
@@ -669,6 +725,7 @@
                 return;
             }
             const rows = data[this.rowsKey];
+            if (this.onLoad) this.onLoad(data);
             const head = el('tr', {}, ...this.columns.map(c => {
                 if (c.sortable === false) return el('th', { text: c.label });
                 const sorted = this.state.sort === c.key;
@@ -676,7 +733,10 @@
                                   text: c.label, onclick: () => this.sortBy(c) });
             }));
             const body = rows.map(row => el('tr', this.onRowClick ? { class: 'clickable', onclick: () => this.onRowClick(row) } : {},
-                ...this.columns.map(c => el('td', c.num ? { class: 'num' } : {}, String((c.format || (v => v ?? ''))(row[c.key], row))))));
+                ...this.columns.map(c => {
+                    const value = (c.format || (v => v ?? ''))(row[c.key], row);
+                    return el('td', c.num ? { class: 'num' } : {}, value instanceof Node ? value : String(value));
+                })));
             this.container.replaceChildren(rows.length
                 ? el('div', { class: 'table-wrap' }, el('table', { class: 'data' }, el('thead', {}, head), el('tbody', {}, ...body)))
                 : el('div', { class: 'empty', text: 'Nothing matches.' }));
@@ -706,7 +766,8 @@
         onRowClick: row => showHostPanel(row.ip),
         columns: [
             { key: 'ip', label: 'IP' }, { key: 'mac', label: 'MAC' }, { key: 'vendor', label: 'Vendor' },
-            { key: 'category', label: 'Category' }, { key: 'role', label: 'Role' }, { key: 'kind', label: 'Type' },
+            { key: 'category', label: 'Category' }, { key: 'role', label: 'Role' },
+            { key: 'model', label: 'Model' }, { key: 'firmware', label: 'Firmware' }, { key: 'kind', label: 'Type' },
             { key: 'via_mac', label: 'Via router' },
             { key: 'packets_sent', label: 'Pkts sent', num: true, format: fmt },
             { key: 'packets_received', label: 'Pkts received', num: true, format: fmt },
@@ -735,11 +796,38 @@
             { key: 'mac', label: 'MAC' }, { key: 'vendor', label: 'Vendor' }, { key: 'name', label: 'Name' },
             { key: 'ips', label: 'IPs', sortable: false, format: list }, { key: 'vlans', label: 'VLANs', sortable: false, format: list },
             { key: 'category', label: 'Category' }, { key: 'role', label: 'Role' },
+            { key: 'model', label: 'Model' }, { key: 'firmware', label: 'Firmware' },
             { key: 'layer2', label: 'Layer-2 protocols', sortable: false, format: list },
             { key: 'switch', label: 'Switch' }, { key: 'port', label: 'Port' },
             { key: 'packets', label: 'Frames sent', num: true, format: fmt },
             { key: 'last_seen', label: 'Last seen', num: true, format: when }
         ]
+    });
+
+    const kindSelect = document.getElementById('operations-kind');
+    const operationsTable = new PagedTable({
+        name: 'operations', endpoint: `${API}/operations`, rowsKey: 'operations', sort: 'kind', order: 'asc',
+        hostLabel: 'operations',
+        onRowClick: row => showHostPanel(row.dst),
+        onLoad: data => {
+            const selected = kindSelect.value;
+            kindSelect.replaceChildren(el('option', { value: '', text: `All kinds (${fmt(Object.values(data.kinds).reduce((a, b) => a + b, 0))})` }),
+                ...Object.keys(KIND_LABELS).filter(kind => data.kinds[kind])
+                    .map(kind => el('option', { value: kind, text: `${KIND_LABELS[kind]} (${fmt(data.kinds[kind])})` })));
+            kindSelect.value = selected;
+        },
+        columns: [
+            { key: 'src', label: 'Client' }, { key: 'dst', label: 'Server' }, { key: 'protocol', label: 'Protocol' },
+            { key: 'operation', label: 'Operation' }, { key: 'kind', label: 'Kind', format: kindBadge },
+            { key: 'count', label: 'Count', num: true, format: fmt },
+            { key: 'first_seen', label: 'First seen', num: true, format: when }, { key: 'last_seen', label: 'Last seen', num: true, format: when },
+            { key: 'first_frame', label: 'First frame', num: true, sortable: false }
+        ]
+    });
+    kindSelect.addEventListener('change', () => {
+        operationsTable.state.kind = kindSelect.value;
+        operationsTable.state.offset = 0;
+        operationsTable.load();
     });
 
     // --- tabs and controls
@@ -754,6 +842,7 @@
         if (name === 'hosts' && !hostsTable.loaded) hostsTable.load();
         if (name === 'flows' && !flowsTable.loaded) flowsTable.load();
         if (name === 'devices' && !devicesTable.loaded) devicesTable.load();
+        if (name === 'operations' && !operationsTable.loaded) operationsTable.load();
         if (name === 'physical') {
             if (!physicalLoaded) loadPhysical();
             else if (physicalCy) physicalCy.resize();
@@ -762,6 +851,7 @@
 
     document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
     document.getElementById('flows-host-clear').addEventListener('click', () => { flowsTable.setHost(null); flowsTable.load(); });
+    document.getElementById('operations-host-clear').addEventListener('click', () => { operationsTable.setHost(null); operationsTable.load(); });
 
     let filterTimer = null;
     document.getElementById('graph-filter').addEventListener('input', () => {
@@ -775,6 +865,7 @@
         if (hostsTable.loaded) hostsTable.load();
         if (flowsTable.loaded) flowsTable.load();
         if (devicesTable.loaded) devicesTable.load();
+        if (operationsTable.loaded) operationsTable.load();
         if (physicalLoaded) loadPhysical();
     });
     document.getElementById('collapse-toggle').addEventListener('click', async event => {

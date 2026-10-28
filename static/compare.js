@@ -25,9 +25,19 @@
             el('span', { class: 'change-now', text: c.now || 'none' })))) }
     ];
 
+    const KIND_LABELS = { program: 'Program', control: 'Control', write: 'Write', read: 'Read', diagnostic: 'Diagnostic',
+                          data: 'Data', session: 'Session', error: 'Error', other: 'Other' };
+    const operationColumns = [
+        { key: 'src', label: 'Client' }, { key: 'dst', label: 'Server' }, { key: 'protocol', label: 'Protocol' },
+        { key: 'operation', label: 'Operation' },
+        { key: 'kind', label: 'Kind', format: kind => el('span', { class: `kind kind-${kind}`, text: KIND_LABELS[kind] || kind }) },
+        { key: 'count', label: 'Count', num: true, format: fmt }, { key: 'first_seen', label: 'First seen', format: when }
+    ];
+
     const SECTIONS = [
         ['new_hosts', 'New hosts', hostColumns, true],
         ['changed_hosts', 'Hosts that changed', changeColumns, true],
+        ['new_operations', 'New industrial operations', operationColumns, true],
         ['new_conversations', 'New conversations', conversationColumns, true],
         ['new_macs', 'New MAC addresses', macColumns, true],
         ['new_layer2', 'New layer-2 protocols', [{ key: 'src_mac', label: 'Sender' }, { key: 'protocol', label: 'Protocol' },

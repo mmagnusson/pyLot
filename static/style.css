@@ -343,6 +343,37 @@ textarea {
 .summary-grid .stat-box.warn strong {
     color: #b06d00;
 }
+.kind {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 12px;
+    background: #e9ecef;
+    color: #333;
+}
+.kind-program, .kind-control {
+    background: #fdecea;
+    color: #a52a1f;
+    font-weight: bold;
+}
+.kind-write {
+    background: #fff1e6;
+    color: #a14a12;
+    font-weight: bold;
+}
+.kind-error {
+    background: #fff8e1;
+    color: #8a6100;
+}
+.tab-hint {
+    margin: 0;
+    padding: 8px 15px 0;
+}
+.legend span.line-swatch::before {
+    height: 3px;
+    width: 14px;
+    vertical-align: middle;
+}
 .change-before {
     color: #842029;
 }

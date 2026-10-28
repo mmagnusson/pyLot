@@ -25,8 +25,8 @@ def _proto(transport):
         return dpkt.ip.IP_PROTO_UDP
     return dpkt.ip.IP_PROTO_ICMP
 
-def tcp_frame(src, dst, sport, dport, payload=b'', flags=dpkt.tcp.TH_ACK | dpkt.tcp.TH_PUSH, opts=b'', **kwargs):
-    tcp = dpkt.tcp.TCP(sport=sport, dport=dport, flags=flags, opts=opts, data=payload)
+def tcp_frame(src, dst, sport, dport, payload=b'', flags=dpkt.tcp.TH_ACK | dpkt.tcp.TH_PUSH, opts=b'', seq=0xdeadbeef, **kwargs):
+    tcp = dpkt.tcp.TCP(sport=sport, dport=dport, flags=flags, opts=opts, seq=seq, data=payload)
     tcp.off = 5 + len(opts) // 4  # dpkt doesn't size the header for options itself
     return ipv4_frame(src, dst, tcp, **kwargs)
 
@@ -162,3 +162,98 @@ def goose_frame(src_mac, gocb_ref='IED1LD0/LLN0$GO$gcb01', dataset='IED1LD0/LLN0
     apdu = _ber(0x61, pdu)
     payload = struct.pack('>HHHH', appid, 8 + len(apdu), 0, 0) + apdu
     return ethernet('01:0c:cd:01:00:01', src_mac, 0x88B8, payload, vlan=5)
+
+# --- industrial protocol messages (application payloads)
+
+def modbus_adu(function, data=b'', unit=1, transaction=1):
+    pdu = bytes([function]) + data
+    return struct.pack('>HHHB', transaction, 0, len(pdu) + 1, unit) + pdu
+
+def modbus_device_identification(objects, unit=1):
+    """A Read Device Identification reply carrying {object id: text}."""
+    body = b''.join(bytes([oid, len(value)]) + value.encode() for oid, value in objects.items())
+    return modbus_adu(43, bytes([0x0e, 0x01, 0x01, 0x00, 0x00, len(objects)]) + body, unit)
+
+def dnp3_frame(function, source=1, destination=10, control=0xC4, transport=0xC0, app_control=0xC0, objects=b''):
+    """A DNP3 link frame with one application fragment, CRCs and all."""
+    from parser.ics.dnp3 import crc
+    user = bytes([transport, app_control, function]) + objects
+    header = b'\x05\x64' + bytes([5 + len(user), control]) + struct.pack('<HH', destination, source)
+    frame = header + struct.pack('<H', crc(header))
+    for i in range(0, len(user), 16):
+        block = user[i:i + 16]
+        frame += block + struct.pack('<H', crc(block))
+    return frame
+
+def tpkt(payload):
+    cotp = b'\x02\xf0\x80'
+    return struct.pack('>BBH', 3, 0, 4 + len(cotp) + len(payload)) + cotp + payload
+
+def s7_job(parameters, data=b''):
+    return tpkt(struct.pack('>BBHHHH', 0x32, 1, 0, 1, len(parameters), len(data)) + parameters + data)
+
+def s7_read_var(area=0x84, db=1):
+    item = b'\x12\x0a\x10\x02' + struct.pack('>HHB', 4, db, area) + b'\x00\x00\x00'
+    return s7_job(b'\x04\x01' + item)
+
+def s7_userdata(group, subfunction, data=b'', response=False, error=0):
+    kind = 0x8 if response else 0x4
+    parameters = b'\x00\x01\x12' + bytes([8 if response else 4, 0x12 if response else 0x11, kind << 4 | group, subfunction, 0])
+    if response:
+        parameters += b'\x00\x00' + struct.pack('>H', error)
+    return tpkt(struct.pack('>BBHHHH', 0x32, 7, 0, 1, len(parameters), len(data)) + parameters + data)
+
+def s7_szl_reply(szl_id, entries, entry_length):
+    body = struct.pack('>HHHH', szl_id, 0, entry_length, len(entries)) + b''.join(entries)
+    return s7_userdata(4, 1, b'\xff\x09' + struct.pack('>H', len(body)) + body, response=True)
+
+def szl_module_entry(index, order='', version=b'\x00\x00\x00\x00'):
+    return struct.pack('>H', index) + order.encode().ljust(20) + b'\x00\xc0' + version
+
+def szl_component_entry(index, value):
+    return struct.pack('>H', index) + value.encode().ljust(32, b'\x00')
+
+def enip(command, body=b'', context=b'\x00' * 8, session=1):
+    return struct.pack('<HHII', command, len(body), session, 0) + context + b'\x00' * 4 + body
+
+def cip_identity(vendor=1, device_type=14, product_code=90, revision=(20, 11), serial=0x00ABCDEF, name='1756-L71/B LOGIX5571'):
+    return (struct.pack('<HHHBBHI', vendor, device_type, product_code, revision[0], revision[1], 0x0030, serial)
+            + bytes([len(name)]) + name.encode())
+
+def enip_list_identity_reply(**identity):
+    item = struct.pack('<H', 1) + b'\x00\x02\xaf\x12' + b'\x0a\x00\x00\x03' + b'\x00' * 8 + cip_identity(**identity) + b'\x03'
+    return enip(0x63, struct.pack('<HHH', 1, 0x0c, len(item)) + item)
+
+def cip_path(cls, instance=1, attribute=None):
+    path = bytes([0x20, cls, 0x24, instance]) + (bytes([0x30, attribute]) if attribute is not None else b'')
+    return bytes([len(path) // 2]) + path
+
+def enip_send_rr(cip, context=b'ctx00001'):
+    body = b'\x00' * 6 + struct.pack('<HHHHH', 2, 0, 0, 0xb2, len(cip)) + cip
+    return enip(0x6f, body, context)
+
+def iec104_apdu(type_id, cause=6, address=1, information=b'\x00\x00\x00\x01'):
+    asdu = bytes([type_id, 1, cause, 0]) + struct.pack('<H', address) + information
+    return bytes([0x68, 4 + len(asdu)]) + b'\x00\x00\x00\x00' + asdu
+
+def bacnet(apdu, broadcast=False):
+    npdu = b'\x01\x00' + apdu
+    return struct.pack('>BBH', 0x81, 0x0b if broadcast else 0x0a, 4 + len(npdu)) + npdu
+
+def bacnet_i_am(instance, vendor):
+    return bacnet(b'\x10\x00' + b'\xc4' + struct.pack('>I', 8 << 22 | instance) + b'\x22\x05\xc4\x91\x03\x21' + bytes([vendor]),
+                  broadcast=True)
+
+def bacnet_read_property_ack(instance, prop, value):
+    string = b'\x00' + value.encode()
+    return bacnet(b'\x30\x01\x0c' + b'\x0c' + struct.pack('>I', 8 << 22 | instance) + b'\x19' + bytes([prop])
+                  + b'\x3e\x75' + bytes([len(string)]) + string + b'\x3f')
+
+def snmp_get_response(oid, value, pdu_tag=0xa2):
+    def element(tag, data):
+        return bytes([tag, len(data)]) + data
+    parts = [int(p) for p in oid.split('.')]
+    encoded = bytes([parts[0] * 40 + parts[1]]) + bytes(parts[2:])
+    binding = element(0x30, element(0x06, encoded) + element(0x04, value.encode()))
+    pdu = element(pdu_tag, element(0x02, b'\x01') + element(0x02, b'\x00') + element(0x02, b'\x00') + element(0x30, binding))
+    return element(0x30, element(0x02, b'\x01') + element(0x04, b'public') + pdu)

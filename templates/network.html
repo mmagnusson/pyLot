@@ -47,6 +47,7 @@
             <button class="tab" data-tab="hosts">Hosts</button>
             <button class="tab" data-tab="devices">Devices</button>
             <button class="tab" data-tab="flows">Flows</button>
+            <button class="tab" data-tab="operations">Operations</button>
         </div>
 
         <div id="tab-graph" class="tab-pane">
@@ -130,6 +131,21 @@
             </div>
             <div id="flows-table"></div>
             <div id="flows-pager" class="pager"></div>
+        </div>
+
+        <div id="tab-operations" class="tab-pane hidden">
+            <div class="toolbar">
+                <input type="search" id="operations-filter" placeholder="Search address, protocol or operation..." style="width: 300px">
+                <select id="operations-kind"><option value="">All kinds</option></select>
+                <span id="operations-host" class="hidden"><span id="operations-host-label"></span> <button class="btn secondary" id="operations-host-clear">Show all</button></span>
+                <span class="spacer"></span>
+                <a class="btn secondary" href="{{ url_for('export_operations', session_id=session.id) }}">Operations CSV</a>
+            </div>
+            <p class="hint tab-hint">What clients asked servers to do, decoded from Modbus, DNP3, S7comm, EtherNet/IP (CIP), IEC 60870-5-104,
+               BACnet and SNMP. Program, control and write operations change a device and are listed first;
+               errors and reported data appear under the conversation they belong to.</p>
+            <div id="operations-table"></div>
+            <div id="operations-pager" class="pager"></div>
         </div>
     </div>
 

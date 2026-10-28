@@ -3,7 +3,7 @@ import ipaddress
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from parser import protocols, zeek
+from parser import ics, protocols, zeek
 from parser.mac_lookup import lookup_manufacturer
 
 # A MAC that carries traffic for more IPs than this is a router forwarding for them, not their own NIC
@@ -27,6 +27,14 @@ class Traffic:
     last_seen: float
     packets: int = 0
     bytes: int = 0
+
+@dataclass(slots=True)
+class OperationStats:
+    kind: str
+    first_seen: float
+    last_seen: float
+    first_frame: int
+    count: int = 0
 
 @dataclass(slots=True)
 class Evidence:
@@ -57,11 +65,13 @@ class CaptureAnalyzer:
         self.l2_flows = {}                      # (src MAC, dst MAC, protocol) -> Traffic, for frames without IP or ARP
         self.mac_evidence = {}                  # (MAC, protocol, property, value) -> Evidence, from layer-2 announcements
         self.vlans = Counter()                  # (source MAC, VLAN ID) -> frames
+        self.operations = {}                    # (src, dst, protocol, operation) -> OperationStats, from decoded ICS protocols
+        self.decoder = ics.Decoder()
         self._src_macs = defaultdict(Counter)   # ip -> MACs its packets came from
         self._dst_macs = defaultdict(Counter)   # ip -> MACs its packets were sent to
         self._mac_ips = defaultdict(set)        # MAC -> IPs it carried, in either direction
         self._dirty = {'flows': set(), 'macs': set(), 'arp': set(), 'evidence': set(), 'l2_flows': set(),
-                       'mac_evidence': set(), 'vlans': set()}
+                       'mac_evidence': set(), 'vlans': set(), 'operations': set()}
 
     def add(self, pkt):
         self.packet_count += 1
@@ -100,6 +110,17 @@ class CaptureAnalyzer:
             for name, value in annotation.properties.items():
                 self._add_evidence(self.evidence, 'evidence', (annotation.ip, annotation.fingerprint, name, value),
                                    annotation.confidence, pkt.frame)
+        operations, facts = self.decoder.decode(pkt)
+        for src, dst, protocol, name, kind in operations:
+            key = (src, dst, protocol, name)
+            stats = self.operations.get(key)
+            if stats is None:
+                stats = self.operations[key] = OperationStats(kind, pkt.time, pkt.time, pkt.frame)
+            stats.count += 1
+            stats.last_seen = max(stats.last_seen, pkt.time)
+            self._dirty['operations'].add(key)
+        for ip, source, name, value, confidence in facts:
+            self._add_evidence(self.evidence, 'evidence', (ip, source, name, value), confidence, pkt.frame)
 
     def add_connection(self, c):
         """
@@ -268,6 +289,11 @@ class CaptureAnalyzer:
         """(mac, protocol, name, value, confidence, count, first_frame)"""
         return [key + (e.confidence, e.count, e.first_frame)
                 for key in self._keys(self.mac_evidence, 'mac_evidence', only_dirty) for e in [self.mac_evidence[key]]]
+
+    def operation_rows(self, only_dirty=False):
+        """(src, dst, protocol, operation, kind, count, first_seen, last_seen, first_frame)"""
+        return [key + (o.kind, o.count, o.first_seen, o.last_seen, o.first_frame)
+                for key in self._keys(self.operations, 'operations', only_dirty) for o in [self.operations[key]]]
 
     def vlan_rows(self, only_dirty=False):
         """(mac, vlan, packets)"""

@@ -109,6 +109,19 @@ CREATE TABLE IF NOT EXISTS mac_vlans (
     packets INTEGER NOT NULL,
     PRIMARY KEY (session_id, mac, vlan)
 );
+CREATE TABLE IF NOT EXISTS operations (         -- what clients asked servers to do, from decoded industrial protocols
+    session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+    src TEXT NOT NULL,
+    dst TEXT NOT NULL,
+    protocol TEXT NOT NULL,
+    operation TEXT NOT NULL,             -- e.g. Write Single Register, PLC Stop, Direct Operate
+    kind TEXT NOT NULL,                  -- read, write, control, program, diagnostic, data, session, error or other
+    count INTEGER NOT NULL,
+    first_seen REAL NOT NULL,
+    last_seen REAL NOT NULL,
+    first_frame INTEGER NOT NULL,
+    PRIMARY KEY (session_id, src, dst, protocol, operation)
+);
 CREATE TABLE IF NOT EXISTS switches (           -- imported switch configuration and tables, per session
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
@@ -170,6 +183,8 @@ UPSERT_L2_FLOWS = _upsert('l2_flows', ('src_mac', 'dst_mac', 'protocol', 'packet
 UPSERT_MAC_EVIDENCE = _upsert('mac_evidence', ('mac', 'protocol', 'name', 'value', 'confidence', 'count', 'first_frame'),
                               ('mac', 'protocol', 'name', 'value'))
 UPSERT_VLANS = _upsert('mac_vlans', ('mac', 'vlan', 'packets'), ('mac', 'vlan'))
+UPSERT_OPERATIONS = _upsert('operations', ('src', 'dst', 'protocol', 'operation', 'kind', 'count', 'first_seen', 'last_seen',
+                                           'first_frame'), ('src', 'dst', 'protocol', 'operation'))
 
 SESSION_FIELDS = {'name', 'status', 'error', 'capture_file', 'packet_count', 'first_seen', 'last_seen'}
 
@@ -218,6 +233,7 @@ def save_analysis(conn, session_id, analyzer, only_dirty=False):
         conn.executemany(UPSERT_L2_FLOWS, [(session_id,) + row for row in analyzer.l2_flow_rows(only_dirty)])
         conn.executemany(UPSERT_MAC_EVIDENCE, [(session_id,) + row for row in analyzer.mac_evidence_rows(only_dirty)])
         conn.executemany(UPSERT_VLANS, [(session_id,) + row for row in analyzer.vlan_rows(only_dirty)])
+        conn.executemany(UPSERT_OPERATIONS, [(session_id,) + row for row in analyzer.operation_rows(only_dirty)])
         conn.execute("UPDATE sessions SET packet_count = ?, first_seen = ?, last_seen = ? WHERE id = ?",
                      (analyzer.packet_count, analyzer.first_seen, analyzer.last_seen, session_id))
     analyzer.clear_dirty()
@@ -231,7 +247,8 @@ def get_session(conn, session_id):
     row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
     return dict(row) if row else None
 
-ANALYSIS_TABLES = ('hosts', 'flows', 'mac_addresses', 'arp_bindings', 'evidence', 'l2_flows', 'mac_evidence', 'mac_vlans')
+ANALYSIS_TABLES = ('hosts', 'flows', 'mac_addresses', 'arp_bindings', 'evidence', 'l2_flows', 'mac_evidence', 'mac_vlans',
+                   'operations')
 
 def reset_analysis(conn, session_id):
     """
@@ -286,8 +303,12 @@ def _evidence_by_mac(conn, session_id, mac=None):
         evidence[row['mac']].append(dict(row))
     return evidence
 
+# What a device says it is, from decoded identity replies and layer-2 announcements: the first property present wins
+IDENTITY = (('model', ('Model', 'Product', 'OrderNumber', 'Platform')), ('firmware', ('Firmware', 'Software')),
+            ('serial', ('Serial',)), ('device_vendor', ('Vendor',)))
+
 def _classify(item, evidence, l2_evidence):
-    """Add properties (fingerprints and layer-2 announcements together), category and role to a host or device."""
+    """Add properties (fingerprints, decoded protocols and layer-2 announcements together), category, role and identity."""
     item['properties'] = aggregate_properties([(e['name'], e['value'], e['confidence']) for e in evidence]
                                               + [(e['name'], e['value'], e['confidence']) for e in l2_evidence])
     item['fingerprints'] = sorted({e['fingerprint'] for e in evidence})
@@ -295,6 +316,9 @@ def _classify(item, evidence, l2_evidence):
     for name in ('Category', 'Role'):
         prop = item['properties'].get(name)
         item[name.lower()] = ', '.join(prop['values']) if prop else None
+    for key, names in IDENTITY:
+        prop = next((item['properties'][name] for name in names if name in item['properties']), None)
+        item[key] = ', '.join(prop['values']) if prop else None
     return item
 
 def _host_dict(row, evidence, l2_evidence=()):
@@ -486,8 +510,14 @@ def session_graph(conn, session_id, collapse_external=None, baseline_id=None):
                 edge[counter] += row[counter]
             edge['first_seen'] = min(edge['first_seen'], row['first_seen'])
             edge['last_seen'] = max(edge['last_seen'], row['last_seen'])
+    for row in conn.execute("SELECT src, dst, GROUP_CONCAT(DISTINCT kind) AS kinds FROM operations WHERE session_id = ? "
+                            "GROUP BY src, dst", (session_id,)):
+        edge = edges.get((node_of.get(row['src']), node_of.get(row['dst'])))
+        if edge is not None:
+            edge.setdefault('operations', set()).update(row['kinds'].split(','))
     for edge in edges.values():
         edge['protocols'] = sorted(edge['protocols'])
+        edge['operations'] = sorted(edge.get('operations', ()))  # kinds of industrial operations sent along it
     graph = {'nodes': nodes, 'edges': list(edges.values()), 'collapsed': collapse, 'external_hosts': external_count,
              'groups': [groups[group] for group in sorted(groups)]}
     if diff:
@@ -495,8 +525,8 @@ def session_graph(conn, session_id, collapse_external=None, baseline_id=None):
                              'new_conversations': diff['new_conversations']['total'], 'missing_hosts': diff['missing_hosts']['total']}
     return graph
 
-HOST_SORTS = {'ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'packets_sent', 'packets_received',
-              'bytes_sent', 'bytes_received', 'first_seen', 'last_seen'}
+HOST_SORTS = {'ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'model', 'firmware', 'packets_sent',
+              'packets_received', 'bytes_sent', 'bytes_received', 'first_seen', 'last_seen'}
 FLOW_SORTS = {'src', 'dst', 'transport', 'src_port', 'dst_port', 'protocol', 'packets', 'bytes', 'first_seen', 'last_seen'}
 
 def _ip_key(ip):
@@ -563,7 +593,40 @@ def host_detail(conn, session_id, ip, flow_limit=100):
     host['arp'] = [dict(r) for r in conn.execute("SELECT mac, packets, first_seen, last_seen FROM arp_bindings "
                                                   "WHERE session_id = ? AND ip = ?", (session_id, ip))]
     host['flows'], host['flow_count'] = list_flows(conn, session_id, host=ip, limit=flow_limit)
+    host['operations'], host['operation_count'] = list_operations(conn, session_id, host=ip, sort='kind', limit=flow_limit)
     return host
+
+OPERATION_SORTS = {'src', 'dst', 'protocol', 'operation', 'kind', 'count', 'first_seen', 'last_seen'}
+# Most consequential first when sorting by kind
+KIND_ORDER = "CASE kind WHEN 'program' THEN 0 WHEN 'control' THEN 1 WHEN 'write' THEN 2 WHEN 'error' THEN 3 ELSE 4 END"
+
+def list_operations(conn, session_id, query='', sort='kind', descending=False, limit=None, offset=0, host=None, kind=None):
+    """(page of operation dicts, total matching). query matches addresses, protocol and operation name."""
+    where, params = ['session_id = ?'], [session_id]
+    if host:
+        where.append('(src = ? OR dst = ?)')
+        params += [host, host]
+    if kind:
+        where.append('kind = ?')
+        params.append(kind)
+    query = query.strip()
+    if query:
+        where.append('(src LIKE ? OR dst LIKE ? OR protocol LIKE ? OR operation LIKE ?)')
+        params += [f'%{query}%'] * 4
+    clause = ' AND '.join(where)
+    total = conn.execute(f"SELECT COUNT(*) FROM operations WHERE {clause}", params).fetchone()[0]
+    sort = sort if sort in OPERATION_SORTS else 'kind'
+    order = KIND_ORDER if sort == 'kind' else sort
+    page = " LIMIT ? OFFSET ?" if limit is not None else ""
+    rows = conn.execute(f"SELECT src, dst, protocol, operation, kind, count, first_seen, last_seen, first_frame FROM operations "
+                        f"WHERE {clause} ORDER BY {order} {'DESC' if descending else 'ASC'}, protocol, operation, src, dst{page}",
+                        params + ([limit, offset] if limit is not None else []))
+    return [dict(row) for row in rows], total
+
+def operation_kinds(conn, session_id):
+    """Number of distinct operations of each kind in a session."""
+    return {row['kind']: row['n'] for row in conn.execute(
+        "SELECT kind, COUNT(*) AS n FROM operations WHERE session_id = ? GROUP BY kind", (session_id,))}
 
 def list_l2_flows(conn, session_id, mac=None, limit=None):
     """Conversations that carried neither IP nor ARP (GOOSE, PROFINET, LLDP...), busiest first."""
@@ -685,7 +748,8 @@ def all_devices(conn, session_id):
     result.sort(key=lambda d: d['mac'])
     return result
 
-DEVICE_SORTS = {'mac', 'vendor', 'name', 'category', 'role', 'switch', 'port', 'packets', 'bytes', 'first_seen', 'last_seen'}
+DEVICE_SORTS = {'mac', 'vendor', 'name', 'category', 'role', 'model', 'firmware', 'switch', 'port', 'packets', 'bytes',
+                'first_seen', 'last_seen'}
 
 def list_devices(conn, session_id, query='', sort='mac', descending=False, limit=None, offset=0):
     devices = all_devices(conn, session_id)
@@ -862,11 +926,14 @@ def _new_flow_directions(conn, session_id):
         f"WHERE NOT EXISTS (SELECT 1 FROM conversations_before y WHERE {_SAME_CONVERSATION})", (session_id,))}
 
 COMPARED_PROPERTIES = ('Category', 'Role', 'ICSProtocol')
+# What a device says it is: only a change when both sessions heard it, since not every capture asks
+COMPARED_IDENTITY = ('Vendor', 'Model', 'Product', 'OrderNumber', 'Firmware', 'Serial')
 
 def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limit=None):
     """
     What changed in session_id since baseline_id: new and missing hosts, MAC addresses and conversations,
-    hosts whose MAC or classification changed, and new layer-2 protocols. Lists are cut to limit items
+    hosts whose MAC, classification or reported identity (model, firmware...) changed, new layer-2
+    protocols, and industrial operations clients hadn't sent before. Lists are cut to limit items
     (conversations to conversation_limit, if given), with totals; None means no limit.
     """
     def summary(host):
@@ -892,6 +959,11 @@ def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limi
             is_ = ', '.join(now['properties'].get(name, {}).get('values', [])) or None
             if was != is_:
                 changes.append({'what': name, 'before': was, 'now': is_})
+        for name in COMPARED_IDENTITY:
+            was = ', '.join(before['properties'].get(name, {}).get('values', [])) or None
+            is_ = ', '.join(now['properties'].get(name, {}).get('values', [])) or None
+            if was and is_ and was != is_:
+                changes.append({'what': name, 'before': was, 'now': is_})
         if changes:
             changed.append({'ip': ip, 'changes': changes})
 
@@ -914,4 +986,12 @@ def compare_sessions(conn, session_id, baseline_id, limit=500, conversation_limi
             'missing_conversations': {'items': missing_conversations[0], 'total': missing_conversations[1]},
             'new_macs': cut(sorted((macs_now[m] for m in macs_now.keys() - macs_before.keys()), key=lambda m: m['mac'])),
             'missing_macs': cut(sorted((macs_before[m] for m in macs_before.keys() - macs_now.keys()), key=lambda m: m['mac'])),
-            'new_layer2': cut(sorted((l2_now[k] for k in l2_now.keys() - l2_before.keys()), key=lambda r: (r['protocol'], r['src_mac'])))}
+            'new_layer2': cut(sorted((l2_now[k] for k in l2_now.keys() - l2_before.keys()), key=lambda r: (r['protocol'], r['src_mac']))),
+            'new_operations': cut(_new_operations(conn, session_id, baseline_id))}
+
+def _new_operations(conn, session_id, baseline_id):
+    """Operations a client sent a server that it didn't in the baseline, most consequential first."""
+    return [dict(row) for row in conn.execute(
+        f"SELECT src, dst, protocol, operation, kind, count, first_seen FROM operations o WHERE session_id = ? AND NOT EXISTS "
+        f"(SELECT 1 FROM operations b WHERE b.session_id = ? AND b.src = o.src AND b.dst = o.dst AND b.protocol = o.protocol "
+        f"AND b.operation = o.operation) ORDER BY {KIND_ORDER}, protocol, operation, src, dst", (session_id, baseline_id))]

@@ -31,8 +31,10 @@ def test_session_graph(conn):
     storage.save_analysis(conn, session_id, modbus_analyzer())
     graph = storage.session_graph(conn, session_id)
     nodes = {n['ip']: n for n in graph['nodes']}
-    assert nodes['10.0.0.57']['properties']['Role'] == {'confidence': 4, 'values': ['MASTER']}
+    # Decoding the Modbus request outranks the fingerprint's confidence-4 guess at the same role
+    assert nodes['10.0.0.57']['properties']['Role'] == {'confidence': 2, 'values': ['MASTER']}
     assert nodes['10.0.0.3']['properties']['Unit'] == {'confidence': 4, 'values': ['0A']}
+    assert storage.list_operations(conn, session_id)[0][0]['operation'] == 'Read Holding Registers'
     assert {(e['source'], e['target']) for e in graph['edges']} == {('10.0.0.57', '10.0.0.3'), ('10.0.0.3', '10.0.0.57')}
     assert graph['edges'][0]['protocols'] == ['Modbus']
     assert storage.get_session(conn, session_id)['packet_count'] == 2
