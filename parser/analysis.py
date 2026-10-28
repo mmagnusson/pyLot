@@ -3,12 +3,14 @@ import ipaddress
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 
-from parser import protocols
+from parser import protocols, zeek
 from parser.mac_lookup import lookup_manufacturer
 
 # A MAC that carries traffic for more IPs than this is a router forwarding for them, not their own NIC
 GATEWAY_IP_THRESHOLD = 3
 BROADCAST_MAC = 'ff:ff:ff:ff:ff:ff'
+# Zeek names a connection's protocol from its own analyzers, not a fingerprint; trust it like a likely match
+ZEEK_CONFIDENCE = 3
 
 @dataclass(slots=True)
 class HostStats:
@@ -98,6 +100,58 @@ class CaptureAnalyzer:
             for name, value in annotation.properties.items():
                 self._add_evidence(self.evidence, 'evidence', (annotation.ip, annotation.fingerprint, name, value),
                                    annotation.confidence, pkt.frame)
+
+    def add_connection(self, c):
+        """
+        One connection from a Zeek conn.log (parser.zeek.Connection): hosts and flows in both directions from
+        its packet and byte counts, MAC attribution when Zeek logged layer-2 addresses, and a classification
+        from Zeek's service name for industrial protocols.
+        """
+        end = c.ts + c.duration
+        self.packet_count += c.orig_pkts + c.resp_pkts
+        self.first_seen = c.ts if self.first_seen is None else min(self.first_seen, c.ts)
+        self.last_seen = end if self.last_seen is None else max(self.last_seen, end)
+        directions = ((c.orig_h, c.resp_h, c.orig_p, c.resp_p, c.orig_pkts, c.orig_bytes, c.orig_mac, c.resp_mac),
+                      (c.resp_h, c.orig_h, c.resp_p, c.orig_p, c.resp_pkts, c.resp_bytes, c.resp_mac, c.orig_mac))
+        for src, dst, src_port, dst_port, packets, size, src_mac, dst_mac in directions:
+            if not packets:
+                continue
+            for ip, sent in ((src, True), (dst, False)):
+                host = self._host(ip, c.ts)
+                host.last_seen = max(host.last_seen, end)
+                if sent:
+                    host.packets_sent += packets
+                    host.bytes_sent += size
+                else:
+                    host.packets_received += packets
+                    host.bytes_received += size
+            if src_mac:
+                self._add_traffic(self.macs, 'macs', src_mac, c.ts, end, packets, size)
+                self._src_macs[src][src_mac] += packets
+                self._mac_ips[src_mac].add(src)
+            if dst_mac:
+                self._dst_macs[dst][dst_mac] += packets
+                self._mac_ips[dst_mac].add(dst)
+            self._add_traffic(self.flows, 'flows', (src, dst, c.transport, src_port, dst_port), c.ts, end, packets, size)
+        for service in c.services:
+            known = zeek.ICS_SERVICES.get(service.lower())
+            if known is None:
+                continue
+            protocol, orig_role, resp_role = known
+            for ip, role in ((c.orig_h, orig_role), (c.resp_h, resp_role)):
+                for name, value in (('ICSProtocol', protocol), ('Role', role)):
+                    self._add_evidence(self.evidence, 'evidence', (ip, f'Zeek service {service}', name, value), ZEEK_CONFIDENCE, 0)
+
+    def _add_traffic(self, table, dirty_name, key, first, last, packets, size):
+        traffic = table.get(key)
+        if traffic is None:
+            traffic = table[key] = Traffic(first_seen=first, last_seen=last)
+        else:
+            traffic.first_seen = min(traffic.first_seen, first)
+            traffic.last_seen = max(traffic.last_seen, last)
+        traffic.packets += packets
+        traffic.bytes += size
+        self._dirty[dirty_name].add(key)
 
     def _layer2(self, pkt):
         if not pkt.src_mac:

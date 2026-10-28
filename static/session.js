@@ -21,6 +21,7 @@
 
     let cy = null;
     let collapse = null;  // null lets the server decide whether to merge hosts behind routers
+    let baseline = '';    // session id to mark changes against, or '' for none
     let graphLoaded = false;
     let tooltip = null;
 
@@ -86,7 +87,7 @@
 
     function searchText(node) {
         const values = Object.values(node.properties).flatMap(p => p.values);
-        return [node.ip, node.mac, node.vendor, node.via_mac, node.kind, ...node.fingerprints, ...node.layer2, ...values]
+        return [node.ip, node.mac, node.vendor, node.via_mac, node.kind, node.change, ...node.fingerprints, ...node.layer2, ...values]
             .filter(Boolean).join(' ').toLowerCase();
     }
 
@@ -118,7 +119,10 @@
     }
 
     async function loadGraph() {
-        const query = collapse === null ? '' : `?collapse=${collapse}`;
+        const params = new URLSearchParams();
+        if (collapse !== null) params.set('collapse', collapse);
+        if (baseline) params.set('baseline', baseline);
+        const query = params.toString() ? `?${params}` : '';
         let data;
         try {
             data = await getJSON(`${API}/graph${query}`);
@@ -153,7 +157,8 @@
                 id: node.id, label: nodeLabel(node), host: node, search: searchText(node),
                 color: node.merged ? MERGED_COLOR : (CATEGORY_COLORS[category] || UNCLASSIFIED_COLOR),
                 shape: node.merged ? 'round-hexagon' : (ROLE_SHAPES[firstToken(node.role)] || 'ellipse'),
-                faded: !['unicast', 'merged'].includes(node.kind)
+                faded: !['unicast', 'merged'].includes(node.kind),
+                change: node.change || ''
             };
             if (!large && node.group) item.parent = `group:${node.group}`;
             return { data: item };
@@ -163,7 +168,8 @@
                 id: `${edge.source}>${edge.target}`, source: edge.source, target: edge.target, edge,
                 label: showEdgeLabels ? edge.protocols.slice(0, 3).join(', ') + (edge.protocols.length > 3 ? '…' : '') : '',
                 width: Math.min(1 + Math.log10(1 + edge.bytes) / 1.5, 8),
-                search: edge.protocols.join(' ').toLowerCase()
+                search: edge.protocols.join(' ').toLowerCase() + (edge.new ? ' new' : ''),
+                isNew: !!edge.new
             }
         }));
 
@@ -174,6 +180,18 @@
             item.style.setProperty('--swatch', CATEGORY_COLORS[category] || UNCLASSIFIED_COLOR);
             legend.append(item);
         });
+        if (data.baseline) {
+            const b = data.baseline;
+            for (const [text, color] of [['New since baseline', '#1e9e4a'], ['Changed since baseline', '#f0ad4e']]) {
+                const item = el('span', { text });
+                item.style.setProperty('--swatch', color);
+                legend.append(item);
+            }
+            notice(`Since the baseline: ${fmt(b.new_hosts)} new hosts, ${fmt(b.changed_hosts)} changed, ${fmt(b.new_conversations)} new conversations, `
+                   + `${fmt(b.missing_hosts)} hosts no longer seen. Filter on "new" or "changed" to show only those.`);
+        } else if (document.getElementById('notice').textContent.startsWith('Since the baseline')) {
+            notice('');
+        }
         if (categories.size) {
             const item = el('span', { text: 'Unclassified' });
             item.style.setProperty('--swatch', UNCLASSIFIED_COLOR);
@@ -203,6 +221,9 @@
                 { selector: 'edge', style: { 'label': 'data(label)', 'width': 'data(width)', 'line-color': '#999',
                                              'target-arrow-shape': 'triangle', 'target-arrow-color': '#999', 'curve-style': 'bezier',
                                              'font-size': 9, 'text-rotation': 'autorotate', 'color': '#444' } },
+                { selector: 'node[change = "new"]', style: { 'border-width': 5, 'border-color': '#1e9e4a' } },
+                { selector: 'node[change = "changed"]', style: { 'border-width': 5, 'border-color': '#f0ad4e' } },
+                { selector: 'edge[?isNew]', style: { 'line-color': '#1e9e4a', 'target-arrow-color': '#1e9e4a' } },
                 { selector: '.selected', style: { 'border-width': 4, 'border-color': '#222', 'line-color': '#222', 'target-arrow-color': '#222' } },
                 { selector: '.filtered-out', style: { 'display': 'none' } }
             ].concat(fastStyle)
@@ -227,8 +248,11 @@
         cy.on('mouseover', 'node', event => {
             const host = event.target.data('host');
             if (!host) return;
-            const lines = host.merged ? [`${host.merged} hosts reached via router ${host.via_mac}`]
-                : [host.ip, host.vendor ? `${host.mac} (${host.vendor})` : host.mac, [host.category, host.role].filter(Boolean).join(' ')];
+            const lines = host.merged ? [`${host.merged} hosts reached via router ${host.via_mac}`,
+                                         host.new_hosts ? `${host.new_hosts} new since the baseline` : null]
+                : [host.ip, host.vendor ? `${host.mac} (${host.vendor})` : host.mac, [host.category, host.role].filter(Boolean).join(' '),
+                   host.change === 'new' ? 'New since the baseline' : null,
+                   ...(host.changes || []).map(c => `${c.what}: ${c.before || 'none'} → ${c.now || 'none'}`)];
             showTooltip(event, lines.filter(Boolean).join('\n') + '\nClick for details');
         });
         cy.on('mouseout', 'node', hideTooltip);
@@ -297,6 +321,15 @@
         { key: 'packets', label: 'Packets', num: true, format: fmt }, { key: 'bytes', label: 'Bytes', num: true, format: fmt }
     ];
 
+    function baselineChanges(ip) {
+        const node = cy && cy.getElementById(ip);
+        const host = node && node.length ? node.data('host') : null;
+        if (!host || !host.change) return [];
+        if (host.change === 'new') return [el('p', { class: 'notice', text: 'New since the baseline.' })];
+        return [el('h3', { text: 'Changed since the baseline' }),
+                table([{ key: 'what', label: 'What' }, { key: 'before', label: 'Before' }, { key: 'now', label: 'Now' }], host.changes)];
+    }
+
     async function showHostPanel(ip) {
         openPanel(ip, el('p', { text: 'Loading…' }));
         let host;
@@ -308,6 +341,7 @@
         }
         const properties = Object.entries(host.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(ip,
+            ...baselineChanges(ip),
             facts([['Network', host.network], ['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
                    ['Address type', host.kind === 'unicast' ? null : host.kind],
                    ['ARP', host.arp.map(a => a.mac).join(', ')],
@@ -732,6 +766,13 @@
         await loadGraph();
         button.disabled = false;
     });
+    const baselineSelect = document.getElementById('baseline-select');
+    if (baselineSelect) {
+        baselineSelect.addEventListener('change', () => {
+            baseline = baselineSelect.value;
+            loadGraph();
+        });
+    }
     document.getElementById('export-png').addEventListener('click', () => {
         if (cy) download(cy.png({ full: true, scale: 2, bg: '#ffffff' }), `session_${SESSION_ID}_graph.png`);
     });

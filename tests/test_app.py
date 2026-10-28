@@ -74,7 +74,7 @@ def test_unreadable_capture_is_reported_and_discarded(client):
 def test_analysis_failures_mark_the_session_failed_and_are_escaped(client, monkeypatch):
     def explode(path):
         raise RuntimeError('<script>alert(1)</script>')
-    monkeypatch.setattr(app_module, 'parse_pcap', explode)
+    monkeypatch.setattr(app_module, 'parse_file', explode)
     assert upload(client).status_code == 302
     session = client.get('/api/sessions/1').get_json()
     assert session['status'] == 'failed' and '<script>alert(1)</script>' in session['error']
@@ -242,3 +242,21 @@ def test_compare_sessions(client):
     assert client.get('/api/sessions/2/compare').status_code == 400
     assert client.get('/api/sessions/2/compare?baseline=99').status_code == 400
     assert client.get('/sessions/2/compare?baseline=1').status_code == 200
+
+def test_graph_with_a_baseline(client):
+    upload(client)
+    upload(client, pcap_bytes([tcp_frame('10.0.0.57', '10.0.0.9', 2578, 22, b'')]))
+    graph = client.get('/api/sessions/2/graph?baseline=1').get_json()
+    assert graph['baseline']['new_hosts'] == 1
+    assert next(n for n in graph['nodes'] if n['id'] == '10.0.0.9')['change'] == 'new'
+    assert client.get('/api/sessions/2/graph?baseline=99').status_code == 400
+
+def test_upload_zeek_conn_log(client):
+    with open(os.path.join(os.path.dirname(__file__), 'data', 'conn.log'), 'rb') as f:
+        data = f.read()
+    assert upload(client, data=data, name='conn.log').headers['Location'] == '/sessions/1'
+    hosts = client.get('/api/sessions/1/hosts').get_json()
+    assert hosts['total'] == 4 and any(h['role'] == 'SLAVE' for h in hosts['hosts'])
+    response = upload(client, data=b'{"not": "zeek"}\n', name='x.json')
+    assert response.status_code == 400 and b'id.orig_h' in response.data
+    assert upload(client, data=b'plain text', name='x.txt').status_code == 400

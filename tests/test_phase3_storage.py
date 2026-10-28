@@ -181,3 +181,22 @@ def test_compare_sessions(conn):
     assert [m['mac'] for m in diff['missing_macs']['items']] == [MAC_B]
     assert [(r['src_mac'], r['protocol']) for r in diff['new_layer2']['items']] == [(PLC_MAC, 'IEC 61850 GOOSE')]
     assert storage.compare_sessions(conn, current, current)['new_hosts']['total'] == 0
+
+def test_graph_marks_changes_since_a_baseline(conn, monkeypatch):
+    reply = packet(src='10.0.0.6', dst='10.0.0.5', src_port=502, dst_port=1234, src_mac=MAC_B, dst_mac=MAC_A)
+    baseline = session_with(conn, [packet(src='10.0.0.5', dst='10.0.0.6', dst_port=502), reply])
+    packets = [packet(src='10.0.0.5', dst='10.0.0.6', dst_port=502), reply, packet(src='10.0.0.5', dst='10.0.0.6', dst_port=22),
+               packet(src='10.0.0.9', dst='10.0.0.6', dst_port=502, src_mac='00:00:00:00:00:09')]
+    packets += [packet(src='10.0.0.5', dst=f'198.51.100.{i}', dst_mac=ROUTER_MAC, dst_port=443) for i in range(1, 5)]
+    current = session_with(conn, packets)
+    graph = storage.session_graph(conn, current, baseline_id=baseline)
+    nodes = {n['id']: n for n in graph['nodes']}
+    assert nodes['10.0.0.9']['change'] == 'new' and nodes['10.0.0.5']['change'] is None
+    edges = {(e['source'], e['target']): e['new'] for e in graph['edges']}
+    assert edges[('10.0.0.9', '10.0.0.6')] and edges[('10.0.0.5', '10.0.0.6')]  # 10.0.0.5 -> :22 is a new conversation
+    assert not edges[('10.0.0.6', '10.0.0.5')]  # only Modbus replies went this way
+    assert graph['baseline'] == {'id': baseline, 'new_hosts': 5, 'changed_hosts': 0, 'new_conversations': 6, 'missing_hosts': 0}
+    merged = storage.session_graph(conn, current, collapse_external=True, baseline_id=baseline)
+    router = next(n for n in merged['nodes'] if n['id'] == f'via:{ROUTER_MAC}')
+    assert router['change'] == 'new' and router['new_hosts'] == 4
+    assert 'baseline' not in storage.session_graph(conn, current)

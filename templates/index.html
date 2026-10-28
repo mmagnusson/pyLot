@@ -120,12 +120,13 @@
         <div class="error">{{ error }}</div>
         {% endif %}
         <div class="upload-form">
-            <h2>Upload a PCAP File</h2>
+            <h2>Upload a Capture</h2>
             <form action="/upload" method="post" enctype="multipart/form-data">
                 <div class="file-input">
-                    <input type="file" name="pcap_file" accept=".pcap,.pcapng" required>
+                    <input type="file" name="pcap_file" accept=".pcap,.pcapng,.cap,.log,.gz,.json" required>
                 </div>
                 <input type="submit" value="Analyze Network Traffic" class="submit-btn">
+                <p style="font-size: 13px; color: #666">PCAP or PCAPNG captures, or a Zeek conn.log (tab-separated or JSON, optionally gzipped).</p>
             </form>
         </div>
 

@@ -398,12 +398,21 @@ def network_of(host, network_map=None):
 # Above this many hosts behind routers, the graph shows one node per router instead of every host
 COLLAPSE_EXTERNAL_THRESHOLD = 200
 
-def session_graph(conn, session_id, collapse_external=None):
+def session_graph(conn, session_id, collapse_external=None, baseline_id=None):
     """
     Hosts as nodes grouped by network, and src->dst traffic as edges. Hosts reached through a router
     are merged into one node per router when there are many of them (or when collapse_external is True),
-    unless they are in a named network.
+    unless they are in a named network. With baseline_id, nodes and edges are marked with what is new
+    or changed since that session.
     """
+    diff = compare_sessions(conn, session_id, baseline_id, limit=None) if baseline_id else None
+    new_ips = {h['ip'] for h in diff['new_hosts']['items']} if diff else set()
+    changed = {c['ip']: c['changes'] for c in diff['changed_hosts']['items']} if diff else {}
+    new_keys = {(c['client'], c['server'], c['transport'], c['port']) for c in diff['new_conversations']['items']} if diff else set()
+    # Directions that carried a new conversation; an edge is new only if its own flows were
+    new_pairs = {(row['src'], row['dst']) for row in conn.execute(
+        "SELECT src, dst, transport, src_port, dst_port FROM flows WHERE session_id = ?", (session_id,))
+        if _conversation(row) in new_keys} if new_keys else set()
     hosts = all_hosts(conn, session_id)
     network_map = NetworkMap.load(conn)
     placed = [(host, network_map.group_of(host)) for host in hosts]
@@ -418,9 +427,14 @@ def session_graph(conn, session_id, collapse_external=None):
                 node = merged[node_id] = {'id': node_id, 'ip': None, 'merged': 0, 'via_mac': host['via_mac'], 'kind': 'merged',
                                           'properties': {}, 'fingerprints': [], 'layer2': [], 'category': None, 'role': None,
                                           'group': None, 'packets_sent': 0, 'packets_received': 0, 'bytes_sent': 0,
-                                          'bytes_received': 0}
+                                          'bytes_received': 0, 'new_hosts': 0, 'change': None}
                 nodes.append(node)
             node['merged'] += 1
+            if host['ip'] in new_ips:
+                node['new_hosts'] += 1
+                node['change'] = 'new'
+            elif host['ip'] in changed and node['change'] is None:
+                node['change'] = 'changed'
             for counter in ('packets_sent', 'packets_received', 'bytes_sent', 'bytes_received'):
                 node[counter] += host[counter]
             continue
@@ -429,7 +443,8 @@ def session_graph(conn, session_id, collapse_external=None):
                              'cidr': named['cidr'] if named else (group if '/' in group else None), 'hosts': 0}
         groups[group]['hosts'] += 1
         node_of[host['ip']] = host['ip']
-        nodes.append({**host, 'id': host['ip'], 'group': group})
+        change = 'new' if host['ip'] in new_ips else ('changed' if host['ip'] in changed else None)
+        nodes.append({**host, 'id': host['ip'], 'group': group, 'change': change, 'changes': changed.get(host['ip'], [])})
 
     edges = {}
     for row in conn.execute(
@@ -439,12 +454,14 @@ def session_graph(conn, session_id, collapse_external=None):
         source, target = node_of[row['src']], node_of[row['dst']]
         if source == target and source.startswith('via:'):
             continue  # traffic between two hosts that were merged into the same node
+        is_new = (row['src'], row['dst']) in new_pairs
         edge = edges.get((source, target))
         if edge is None:
             edges[(source, target)] = {'source': source, 'target': target, 'protocols': set(row['protocols'].split(',')),
                                        'flows': row['flows'], 'packets': row['packets'], 'bytes': row['bytes'],
-                                       'first_seen': row['first_seen'], 'last_seen': row['last_seen']}
+                                       'first_seen': row['first_seen'], 'last_seen': row['last_seen'], 'new': is_new}
         else:
+            edge['new'] = edge['new'] or is_new
             edge['protocols'].update(row['protocols'].split(','))
             for counter in ('flows', 'packets', 'bytes'):
                 edge[counter] += row[counter]
@@ -452,8 +469,12 @@ def session_graph(conn, session_id, collapse_external=None):
             edge['last_seen'] = max(edge['last_seen'], row['last_seen'])
     for edge in edges.values():
         edge['protocols'] = sorted(edge['protocols'])
-    return {'nodes': nodes, 'edges': list(edges.values()), 'collapsed': collapse, 'external_hosts': external_count,
-            'groups': [groups[group] for group in sorted(groups)]}
+    graph = {'nodes': nodes, 'edges': list(edges.values()), 'collapsed': collapse, 'external_hosts': external_count,
+             'groups': [groups[group] for group in sorted(groups)]}
+    if diff:
+        graph['baseline'] = {'id': baseline_id, 'new_hosts': len(new_ips), 'changed_hosts': len(changed),
+                             'new_conversations': diff['new_conversations']['total'], 'missing_hosts': diff['missing_hosts']['total']}
+    return graph
 
 HOST_SORTS = {'ip', 'mac', 'vendor', 'via_mac', 'kind', 'category', 'role', 'packets_sent', 'packets_received',
               'bytes_sent', 'bytes_received', 'first_seen', 'last_seen'}

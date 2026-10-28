@@ -5,7 +5,8 @@ Python web application.
 
 ## Features
 
-- Upload PCAP or PCAPNG captures; each upload becomes a saved session you can revisit or delete
+- Upload PCAP or PCAPNG captures, or Zeek `conn.log` files; each upload becomes a saved session you can
+  revisit or delete
 - Live capture from a network interface, started and stopped from the web page, saved as its own session
 - Classifies hosts with GRASSMARLIN's fingerprint engine and its 118 stock fingerprints (Modbus,
   DNP3, BACnet, EtherNet/IP, S7, IEC 60870-5-104, PROFINET, vendor-specific protocols and more)
@@ -22,7 +23,7 @@ Python web application.
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
   see which device is plugged into which port, how switches connect, and where the capture was taken
 - Baseline comparison: new and missing hosts, MAC addresses and conversations, and hosts whose MAC or
-  classification changed since a known-good capture
+  classification changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
   and CSV exports
 
@@ -67,7 +68,7 @@ Python web application.
 
 2. **Access the web interface:**
    - Open http://127.0.0.1:5000 in your browser
-   - Upload a PCAP or PCAPNG file, or pick an interface and start a live capture
+   - Upload a PCAP or PCAPNG file or a Zeek `conn.log`, or pick an interface and start a live capture
    - Each opens a session page. Uploads are analyzed in the background and appear when ready
    - Click a host or connection for details, including every fingerprint result and its
      confidence (1 is high, 5 is low, as in GRASSMARLIN). The Hosts and Flows tabs list everything
@@ -88,7 +89,18 @@ Python web application.
    switch and port the capture is plugged into when LLDP or CDP was captured.
 
 5. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
-   list, and pick an earlier capture of the network in a known-good state.
+   list, and pick an earlier capture of the network in a known-good state. To see the changes on the
+   graph instead, pick the baseline under "Changes since" on the Logical tab: new hosts and
+   conversations are drawn in green, changed hosts in orange.
+
+### Zeek logs
+
+pyLot reads Zeek's `conn.log`, in the default tab-separated format or as JSON lines, and either one
+gzipped. Zeek records connections rather than packets, so fingerprints, which need packet payloads,
+don't run on them. Instead, hosts are classified from the service Zeek identified, for the industrial
+protocols its analyzers and CISA's ICSNPP plugins recognize (Modbus, DNP3, EtherNet/IP, BACnet, S7,
+IEC 104 and others). MAC addresses are used when Zeek logged them, which it does when the
+`policy/protocols/conn/mac-logging` script is loaded.
 
 Live capture saves to its session every couple of seconds; use the Refresh button on its page to see
 new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is marked
@@ -120,7 +132,8 @@ listed at the top of `parser/fingerprint_matcher.py`. A host's properties use GR
 each property, the values reported at the best confidence.
 
 Extracts that look up a vendor or device name (`ENIPVENDOR`, `ENIPDEVICE`, `BACNET`) read
-`parser/reference/<LOOKUP>.csv` files of `id,name` rows. Without them, the numeric ID is shown.
+`parser/reference/<LOOKUP>.csv` files of `id,name` rows, taken from GRASSMARLIN's tables. IDs that
+aren't listed are shown as numbers.
 
 ## Database
 
@@ -176,5 +189,6 @@ to a GRASSMARLIN checkout's `GM3/data/fingerprint` directory.
 
 ## License
 
-pyLot's code is under the MIT License (see `LICENSE`). The fingerprints in `fingerprints/` are
-derived from NSA's GRASSMARLIN and are under the LGPL-3.0; see `fingerprints/README.md`.
+pyLot's code is under the MIT License (see `LICENSE`). The fingerprints in `fingerprints/` and the
+lookup tables in `parser/reference/` are derived from NSA's GRASSMARLIN and are under the LGPL-3.0;
+see `fingerprints/README.md` and `parser/reference/README.md`.

@@ -1,7 +1,7 @@
 from flask import Flask, Response, render_template, request, redirect, url_for, jsonify, abort
 from werkzeug.utils import secure_filename
-from parser.packets import check_capture
-from parser.pcap_parser import parse_pcap
+from parser import zeek
+from parser.pcap_parser import CAPTURE_MAGIC_NUMBERS, check_file, parse_file
 from parser import switch_config
 from capture import live_capture
 from concurrent.futures import ThreadPoolExecutor
@@ -22,8 +22,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get('PYLOT_DB_PATH', os.path.join(BASE_DIR, 'pylot.sqlite3'))
 UPLOAD_FOLDER = os.environ.get('PYLOT_UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'))
 LOOPBACK_HOSTS = ('127.0.0.1', 'localhost')
-# First four bytes of pcap (both byte orders, micro- and nanosecond timestamps) and pcapng files
-CAPTURE_MAGIC_NUMBERS = (b'\xd4\xc3\xb2\xa1', b'\xa1\xb2\xc3\xd4', b'\x4d\x3c\xb2\xa1', b'\xa1\xb2\x3c\x4d', b'\x0a\x0d\x0d\x0a')
 MAX_PAGE_SIZE = 1000
 MAX_CAPTURE_FILTER_LENGTH = 500
 MAX_SWITCH_FILE_BYTES = 5 * 1024 * 1024
@@ -79,8 +77,9 @@ def upload():
     file = request.files.get('pcap_file')
     if file is None or not file.filename:
         return index_error('No file selected.')
-    if file.stream.read(4) not in CAPTURE_MAGIC_NUMBERS:
-        return index_error('That file is not a PCAP or PCAPNG capture.')
+    head = file.stream.read(16)
+    if head[:4] not in CAPTURE_MAGIC_NUMBERS and not zeek.looks_like_log(head):
+        return index_error('That file is not a PCAP or PCAPNG capture or a Zeek conn.log.')
     file.stream.seek(0)
 
     # Never trust the client's filename: sanitize it and add a random prefix so uploads can't
@@ -89,10 +88,10 @@ def upload():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
     try:
-        check_capture(filepath)
+        check_file(filepath)
     except ValueError as e:
         os.remove(filepath)
-        return index_error(f'Could not read that capture: {e}')
+        return index_error(f'Could not read that file: {e}')
 
     with db() as conn:
         session_id = storage.create_session(conn, file.filename[:200], 'upload', 'processing', capture_file=filename)
@@ -103,7 +102,7 @@ def analyze_upload(session_id, filepath):
     """Background job: analyze an uploaded capture into its session, marking it ready or failed."""
     with db() as conn:
         try:
-            analyzer = parse_pcap(filepath)
+            analyzer = parse_file(filepath)
             storage.save_analysis(conn, session_id, analyzer)
             storage.update_session(conn, session_id, status='ready')
         except Exception as e:
@@ -134,9 +133,10 @@ def start_capture():
 def session_view(session_id):
     with db() as conn:
         session = storage.get_session(conn, session_id)
+        others = [s for s in storage.list_sessions(conn) if s['id'] != session_id]
     if session is None:
         abort(404)
-    return render_template('network.html', session=session)
+    return render_template('network.html', session=session, others=others)
 
 @app.route('/sessions/<int:session_id>/stop', methods=['POST'])
 def stop_capture(session_id):
@@ -204,9 +204,12 @@ def session_status(session_id):
 @app.route('/api/sessions/<int:session_id>/graph')
 def session_graph(session_id):
     collapse = {'true': True, 'false': False}.get(request.args.get('collapse'))  # anything else: automatic
+    baseline_id = request.args.get('baseline', type=int)
     with db() as conn:
         session = _session_or_404(conn, session_id)
-        return jsonify({'session': session, **storage.session_graph(conn, session_id, collapse)})
+        if baseline_id is not None and storage.get_session(conn, baseline_id) is None:
+            return jsonify({'error': 'That baseline session does not exist.'}), 400
+        return jsonify({'session': session, **storage.session_graph(conn, session_id, collapse, baseline_id)})
 
 @app.route('/api/sessions/<int:session_id>/hosts')
 def session_hosts(session_id):

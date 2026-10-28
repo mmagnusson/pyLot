@@ -1,6 +1,7 @@
 import dataclasses
 import logging
 import os
+import struct
 
 import pytest
 
@@ -194,3 +195,22 @@ def test_flags_filter_needs_every_flag(tmp_path):
     assert run(engine, tcp_flags=TCP_FLAGS['SYN'] | TCP_FLAGS['ACK'])
     assert not run(engine, tcp_flags=TCP_FLAGS['SYN'])
     assert not run(engine, transport=17)
+
+def test_bundled_lookup_tables():
+    lookups = Lookups()
+    assert lookups.name('ENIPVENDOR', 1) == 'Rockwell Automation/Allen-Bradley'
+    assert lookups.name('ENIPVENDOR', 21) == 'Lumberg, Inc.'  # a name with a comma
+    assert lookups.name('ENIPDEVICE', 43) == 'Generic Device (keyable)'
+    assert lookups.name('BACNET', 5) == 'Johnson Controls, Inc.'
+    assert lookups.name('BACNET', 999999) == '999999'
+
+def test_enip_list_identity_names_vendor_and_device_type():
+    from parser.pcap_parser import engine
+    payload = bytearray(80)
+    payload[0:2] = b'\x63\x00'                       # ListIdentity
+    payload[24:28] = bytes.fromhex('01000C00')       # one CIP Identity item
+    payload[48:52] = struct.pack('<HH', 1, 14)       # vendor 1, device type 14
+    pkt = packet(src='10.0.0.20', dst='10.0.0.5', transport=17, src_port=44818, dst_port=2222, payload=bytes(payload))
+    properties = {k: v for a in engine.evaluate(pkt) for k, v in a.properties.items()}
+    assert properties['ENIP Vendor'] == 'Rockwell Automation/Allen-Bradley'
+    assert properties['ENIP Device Type'] == 'Programmable Logic Controller'
