@@ -71,7 +71,14 @@ Python web application.
    - Upload a PCAP or PCAPNG file or a Zeek `conn.log`, or pick an interface and start a live capture
    - Each opens a session page. Uploads are analyzed in the background and appear when ready
    - Click a host or connection for details, including every fingerprint result and its
-     confidence (1 is high, 5 is low, as in GRASSMARLIN). The Hosts and Flows tabs list everything
+     confidence (1 is high, 5 is low, as in GRASSMARLIN)
+   - The Logical tab is the IP network graph and the Physical tab the switch-level view. Hosts lists
+     every IP address, Devices every MAC address (including devices that never sent IP traffic) and
+     Flows every conversation
+
+   Live capture saves to its session every couple of seconds; use the Refresh button on its page to
+   see new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is
+   marked "stopped" or "failed" on the next start.
 
 3. **Name your networks (optional):** open Networks from any page and add ranges such as
    `10.20.0.0/24  Packaging line`. Hosts outside named networks are grouped by /24 (IPv4) and /64
@@ -100,27 +107,24 @@ gzipped. Zeek records connections rather than packets, so fingerprints, which ne
 don't run on them. Instead, hosts are classified from the service Zeek identified, for the industrial
 protocols its analyzers and CISA's ICSNPP plugins recognize (Modbus, DNP3, EtherNet/IP, BACnet, S7,
 IEC 104 and others). MAC addresses are used when Zeek logged them, which it does when the
-`policy/protocols/conn/mac-logging` script is loaded.
-
-Live capture saves to its session every couple of seconds; use the Refresh button on its page to see
-new hosts, and Stop capture to end it. A capture or analysis still running when pyLot stops is marked
-"stopped" or "failed" on the next start.
+`policy/protocols/conn/mac-logging` script is loaded. Other Zeek logs (`dns.log`, `http.log` and so on)
+are rejected.
 
 ## Configuration
 
 | Environment variable | Default | Purpose |
 |---|---|---|
-| `PYLOT_MAX_UPLOAD_MB` | `500` | Largest capture file accepted |
+| `PYLOT_MAX_UPLOAD_MB` | `500` | Largest capture or Zeek log accepted |
 | `PYLOT_TRUSTED_HOSTS` | `localhost,127.0.0.1` | Host names the app answers to; other `Host` headers get a 400 |
 | `PYLOT_DB_PATH` | `pylot.sqlite3` in the app directory | Session database |
-| `PYLOT_UPLOAD_FOLDER` | `uploads/` in the app directory | Where uploaded captures are kept |
+| `PYLOT_UPLOAD_FOLDER` | `uploads/` in the app directory | Where uploaded captures and logs are kept |
 
 ## Security
 
 pyLot has no authentication, so by default it only listens on 127.0.0.1. If you pass `--host` to
 listen elsewhere, anyone who can reach that address can use it; set `PYLOT_TRUSTED_HOSTS` to the
-names you'll browse to it by. Uploaded files are stored under random names, non-capture files are
-rejected, and POSTs from other sites are refused.
+names you'll browse to it by. Uploaded files are stored under random names, files that aren't captures
+or Zeek conn.logs are rejected, and requests that change data are refused when they come from other sites.
 
 ## Fingerprints
 
@@ -158,7 +162,8 @@ The database is automatically created on first run.
 - **Live capture fails**: The session shows dumpcap's error. Usually you need to be in the
   wireshark group (log out and back in after adding yourself) or the interface name is wrong
   (`ip link` lists them)
-- **Upload fails**: The error is shown on the upload page; details are in the server log
+- **Upload fails**: The error is shown on the upload page; details are in the server log. For Zeek,
+  upload `conn.log` itself, not another log or a directory archive
 - **400 Bad Request when browsing by hostname or IP**: Add that name to `PYLOT_TRUSTED_HOSTS`
 - **Very large captures**: Analysis runs at roughly 5,000 to 15,000 packets a second in the
   background, one upload at a time. When more than 200 hosts were reached through routers, the graph
@@ -169,11 +174,16 @@ The database is automatically created on first run.
 The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
+- `parser/pcap_parser.py`: entry point that analyzes a capture or Zeek log
 - `parser/packets.py`: pcap/pcapng decoding (dpkt)
+- `parser/zeek.py`: Zeek conn.log reading
 - `parser/fingerprint_loader.py`, `parser/fingerprint_matcher.py`: the fingerprint engine
+- `parser/reference/`: vendor and device name tables for fingerprint lookups
 - `parser/analysis.py`: hosts, flows and evidence for one capture
 - `parser/layer2.py`: LLDP, CDP, STP and industrial Ethernet decoding
 - `parser/switch_config.py`: Cisco switch output parsing for the physical view
+- `parser/mac_lookup.py`, `parser/oui.csv`: MAC vendor lookup (see `README_vendor_enrichment.md`)
+- `parser/protocols.py`: flow labels by well-known port
 - `capture/live_capture.py`: Real-time capture with dumpcap
 - `templates/`: HTML templates
 - `static/`: page scripts (`session.js`, `networks.js`, `compare.js`, shared `common.js`) and `style.css`
