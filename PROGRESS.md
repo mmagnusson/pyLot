@@ -21,7 +21,7 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `1190940` | Roadmap 1 and 2: validated against 474 real ICS captures (fixes for crashes, PROFINET DCP, PVST+, vendor names, speed); Re-analyze buttons |
 | `c171e2a` | Roadmap 3 and 5: industrial protocol decoders (Modbus/UMAS, DNP3, S7comm, EtherNet/IP and CIP, IEC 104, BACnet, SNMP, banners) giving operations and asset identity (vendor, model, firmware, serial) |
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
-| (this branch) | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
+| `d952794` | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
 
 Tests: 215 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
