@@ -41,8 +41,17 @@
         { key: 'count', label: 'Count', num: true, format: fmt }, { key: 'first_seen', label: 'First seen', format: when }
     ];
 
+    const vulnerabilityColumns = [
+        { key: 'status', label: 'Status', format: v => (v === 'affected' ? 'Affected' : 'Possibly affected') },
+        { key: 'score', label: 'CVSS', format: (score, v) => el('span', { class: `severity severity-${v.severity}`,
+                                                                          text: score == null ? 'no score' : score.toFixed(1) }) },
+        { key: 'ip', label: 'Device', format: (ip, v) => (v.module ? `${ip} ${v.module}` : ip) }, { key: 'model', label: 'Model' },
+        { key: 'firmware', label: 'Firmware' }, { key: 'advisory', label: 'Advisory' }, { key: 'title', label: 'Title' }
+    ];
+
     const SECTIONS = [
         ['new_alerts', 'New alerts', alertColumns, true],
+        ['new_vulnerabilities', 'New vulnerabilities', vulnerabilityColumns, true],
         ['new_hosts', 'New hosts', hostColumns, true],
         ['changed_hosts', 'Hosts that changed', changeColumns, true],
         ['new_operations', 'New industrial operations', operationColumns, true],

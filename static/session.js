@@ -77,6 +77,7 @@
             graphLoaded = true;
             loadGraph();
             loadAlerts();
+            loadVulnerabilities();
         }
     }
 
@@ -152,6 +153,98 @@
                        { key: 'src', label: 'Client', format: (v, a) => v || (a.clients ? `${a.clients.length} hosts` : '') },
                        { key: 'dst', label: 'Device', format: v => v || 'many' }, { key: 'count', label: 'Count', num: true, format: fmt }],
                       alerts, showAlertPanel)];
+    }
+
+    // --- vulnerabilities
+
+    let vulnerabilityList = [];
+    let advisoryCount = 0;
+    const STATUS_LABELS = { affected: 'Affected', possible: 'Possibly affected' };
+    const statusText = status => el('span', { class: `status-${status}`, text: STATUS_LABELS[status] || status });
+    const scoreBadge = (score, v) => el('span', { class: `severity severity-${v.severity}`,
+                                                  text: score == null ? 'no score' : `${v.severity} ${score.toFixed(1)}` });
+    const deviceText = v => (v.module ? `${v.ip} ${v.module}` : v.ip);
+    const listText = (items, n = 3) => items.slice(0, n).join(', ') + (items.length > n ? ` and ${items.length - n} more` : '');
+    const VULNERABILITY_COLUMNS = [
+        { key: 'status', label: 'Status', format: statusText }, { key: 'score', label: 'CVSS', format: scoreBadge },
+        { key: 'ip', label: 'Device', format: (v, row) => deviceText(row) }, { key: 'model', label: 'Model' },
+        { key: 'firmware', label: 'Firmware' }, { key: 'advisory', label: 'Advisory' }, { key: 'title', label: 'Title' },
+        { key: 'cves', label: 'CVEs', format: v => listText(v, 2) }, { key: 'match', label: 'Matched by' }
+    ];
+
+    async function loadVulnerabilities() {
+        let data;
+        try {
+            data = await getJSON(`${API}/vulnerabilities`);
+        } catch (error) {
+            document.getElementById('vulns-table').replaceChildren(el('div', { class: 'empty', text: `Could not load vulnerabilities: ${error.message}` }));
+            return;
+        }
+        vulnerabilityList = data.vulnerabilities;
+        advisoryCount = data.advisories;
+        const devices = data.counts.devices;
+        document.getElementById('vuln-box').classList.toggle('hidden', !devices);
+        document.getElementById('vuln-box').classList.toggle('alert-high', devices > 0);
+        setText('vuln-count', fmt(devices));
+        setText('vuln-label', `device${devices === 1 ? '' : 's'} with known vulnerabilities`);
+        renderVulnerabilities();
+    }
+
+    function renderVulnerabilities() {
+        const status = document.getElementById('vulns-status').value;
+        const query = document.getElementById('vulns-filter').value.trim().toLowerCase();
+        const shown = vulnerabilityList.filter(v => (!status || v.status === status) && (!query || [v.ip, v.module, v.vendor, v.model,
+            v.firmware, v.advisory, v.title, v.product, ...v.cves].filter(Boolean).join(' ').toLowerCase().includes(query)));
+        let empty;
+        if (!advisoryCount) {
+            empty = el('div', { class: 'empty' }, 'No security advisories have been imported yet. ',
+                       el('a', { href: '/advisories', text: 'Import them' }), ' to check devices for known vulnerabilities.');
+        } else {
+            empty = el('div', { class: 'empty', text: vulnerabilityList.length ? 'Nothing matches.'
+                : `No device in this session matches any of the ${fmt(advisoryCount)} imported advisories. Only devices that reported their model (for example in an identification reply) can be checked.` });
+        }
+        document.getElementById('vulns-table').replaceChildren(shown.length ? table(VULNERABILITY_COLUMNS, shown, showVulnerabilityPanel) : empty);
+    }
+
+    function externalLink(href, text) {
+        return /^https?:\/\//.test(href || '') ? el('a', { href, text, target: '_blank', rel: 'noopener noreferrer' }) : text;
+    }
+
+    function showVulnerabilityPanel(v) {
+        const cveLinks = v.cves.flatMap((cve, i) => [i ? ', ' : null,
+            /^CVE-\d{4}-\d+$/.test(cve) ? externalLink(`https://nvd.nist.gov/vuln/detail/${cve}`, cve) : cve]);
+        openPanel(`${v.advisory}: ${v.title}`,
+            el('p', {}, scoreBadge(v.score, v), ' ', statusText(v.status)),
+            el('p', { text: v.status === 'affected'
+                ? `The advisory covers this device, and ${v.reason}.`
+                : `The advisory may cover this device: it ${v.reason}.` }),
+            el('h3', { text: 'Device' }),
+            el('p', {}, hostLink(v.ip), v.module ? ` (${v.module})` : null),
+            facts([['Vendor', v.vendor], ['Model', v.model], ['Firmware', v.firmware || 'not seen']]),
+            el('h3', { text: 'Advisory' }),
+            el('p', {}, externalLink(v.url, v.url ? `Read ${v.advisory}` : v.advisory)),
+            facts([['Publisher', v.publisher], ['Released', (v.released || '').slice(0, 10)], ['Affected product', `${v.product_vendor} ${v.product}`],
+                   ['Affected versions', !v.versions || /^vers:all\/\*$/.test(v.versions) ? 'all versions' : v.versions],
+                   ['Matched by', v.match]]),
+            v.cves.length ? el('h3', { text: `CVEs (${v.cves.length})` }) : null,
+            v.cves.length ? el('p', {}, ...cveLinks) : null,
+            v.fix ? el('h3', { text: 'Fix' }) : null,
+            v.fix ? el('p', { text: v.fix }) : null,
+            el('p', { class: 'hint', text: v.match === 'model number'
+                ? 'Matched on an order or model number the advisory lists.'
+                : v.match === 'product name'
+                    ? "Matched on the device's model name appearing in the advisory's product name. Check the exact model in the advisory."
+                    : "Matched on the product family the device's order number belongs to. Advisories for a family may only concern some of its models; check the advisory." }));
+    }
+
+    function vulnerabilitiesSection(vulnerabilities) {
+        if (!vulnerabilities || !vulnerabilities.length) return [];
+        const affected = vulnerabilities.filter(v => v.status === 'affected').length;
+        const count = affected === vulnerabilities.length ? `${affected} affected` : `${affected} affected, ${vulnerabilities.length} in all`;
+        const columns = [{ key: 'score', label: 'CVSS', format: scoreBadge }, { key: 'status', label: 'Status', format: statusText },
+                         { key: 'advisory', label: 'Advisory' }, { key: 'title', label: 'Title' }];
+        if (vulnerabilities.some(v => v.module)) columns.splice(2, 0, { key: 'module', label: 'Module', format: v => v || '' });
+        return [el('h3', { text: `Known vulnerabilities (${count})` }), table(columns, vulnerabilities, showVulnerabilityPanel)];
     }
 
     // --- graph
@@ -391,7 +484,7 @@
     function openPanel(title, ...content) {
         const panel = document.getElementById('panel');
         panel.replaceChildren(el('button', { class: 'close', title: 'Close', text: '×', onclick: closePanel }),
-                              el('h2', { text: title }), ...content);
+                              el('h2', { text: title }), ...content.filter(child => child != null));
         panel.classList.remove('hidden');
         panel.scrollTop = 0;
     }
@@ -436,6 +529,7 @@
             ...baselineChanges(ip),
             ...alertsSection(host.alerts),
             ...identitySection(host),
+            ...vulnerabilitiesSection(host.vulnerabilities),
             facts([['Network', host.network], ['MAC', host.mac], ['Vendor', host.vendor], ['Reached via router', host.via_mac],
                    ['Address type', host.kind === 'unicast' ? null : host.kind],
                    ['ARP', host.arp.map(a => a.mac).join(', ')],
@@ -920,6 +1014,7 @@
         if (name === 'devices' && !devicesTable.loaded) devicesTable.load();
         if (name === 'operations' && !operationsTable.loaded) operationsTable.load();
         if (name === 'alerts') renderAlerts();
+        if (name === 'vulnerabilities') renderVulnerabilities();
         if (name === 'physical') {
             if (!physicalLoaded) loadPhysical();
             else if (physicalCy) physicalCy.resize();
@@ -931,6 +1026,9 @@
     document.getElementById('alerts-severity').addEventListener('change', renderAlerts);
     document.getElementById('alerts-filter').addEventListener('input', renderAlerts);
     document.getElementById('alert-box').addEventListener('click', event => { event.preventDefault(); showTab('alerts'); });
+    document.getElementById('vulns-status').addEventListener('change', renderVulnerabilities);
+    document.getElementById('vulns-filter').addEventListener('input', renderVulnerabilities);
+    document.getElementById('vuln-box').addEventListener('click', event => { event.preventDefault(); showTab('vulnerabilities'); });
     document.getElementById('operations-host-clear').addEventListener('click', () => { operationsTable.setHost(null); operationsTable.load(); });
 
     let filterTimer = null;
@@ -947,6 +1045,7 @@
         if (devicesTable.loaded) devicesTable.load();
         if (operationsTable.loaded) operationsTable.load();
         loadAlerts();
+        loadVulnerabilities();
         if (physicalLoaded) loadPhysical();
     });
     document.getElementById('collapse-toggle').addEventListener('click', async event => {

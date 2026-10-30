@@ -21,6 +21,9 @@ Python web application.
   replies devices send (Modbus Read Device Identification, EtherNet/IP List Identity and Identity
   object, S7 module and component identification, BACnet device properties), plus SNMP system
   descriptions and HTTP, FTP and SSH server banners
+- Known vulnerabilities: imports security advisories in CSAF format (CISA's ICS advisories with one
+  click, or vendors' own) and matches them against each device's vendor, model, order number and
+  firmware, module by module in a ControlLogix chassis
 - Loads fingerprints in GRASSMARLIN's own XML format as well as the YAML conversions in `fingerprints/`
 - Hosts, flows, MAC addresses and ARP bindings, with MAC vendor lookup that doesn't credit a
   router's MAC to the remote hosts behind it
@@ -34,7 +37,7 @@ Python web application.
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
   see which device is plugged into which port, how switches connect, and where the capture was taken
 - Baseline comparison: new and missing hosts, MAC addresses and conversations, new industrial
-  operations, new alerts, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
+  operations, new alerts and vulnerabilities, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
   and CSV exports
 
@@ -87,7 +90,8 @@ Python web application.
      every IP address, Devices every MAC address (including devices that never sent IP traffic) and
      Flows every conversation. Operations lists the industrial operations decoded from the traffic,
      most consequential first, with a filter by kind (program, control, write, read and so on), and
-     Alerts the risky activity found in them; the alert count is shown at the top of the page
+     Alerts the risky activity found in them; the alert count is shown at the top of the page.
+     Vulnerabilities lists the advisories that match the session's devices
    - A host's panel starts with its identity, as the device reported it, when the capture includes
      an identification reply
 
@@ -114,7 +118,10 @@ Python web application.
    also learned on. Without switch data the Physical tab still shows each device's VLAN, and the
    switch and port the capture is plugged into when LLDP or CDP was captured.
 
-5. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
+5. **Check devices for known vulnerabilities (optional):** open Advisories from any page and use
+   "Download from CISA", or import CSAF files there. See [Known vulnerabilities](#known-vulnerabilities).
+
+6. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
    list, and pick an earlier capture of the network in a known-good state. To see the changes on the
    graph instead, pick the baseline under "Changes since" on the Logical tab: new hosts and
    conversations are drawn in green, changed hosts in orange.
@@ -163,6 +170,37 @@ it happened, with the operations involved, a count and the first frame to look a
 Some of these are routine for a SCADA master or an engineering workstation: compare with a baseline
 to see only the alerts that are new.
 
+### Known vulnerabilities
+
+pyLot checks devices against security advisories in CSAF 2.0, the format CISA publishes its ICS
+advisories in. On the Advisories page, "Download from CISA" fetches CISA's CSAF repository (about
+12 MB from GitHub) and imports its ICS and medical advisories; run it again to pick up new and updated
+ones. Vendors such as Siemens, Schneider Electric and Hitachi Energy publish CSAF advisories of their
+own, which can be imported as JSON files or as a .zip or .tar.gz of them. Advisories are shared by
+every session, and an advisory imported again replaces its older revision. Without Internet access,
+download `https://codeload.github.com/cisagov/CSAF/tar.gz/refs/heads/develop` elsewhere and import it,
+or from the command line:
+```bash
+python advisories.py fetch                    # download and import CISA's ICS advisories
+python advisories.py import advisories.tar.gz # or CSAF .json files, or a .zip of them
+python advisories.py status
+```
+
+A device is matched in one of three ways, and the match says which:
+- **model number**: the advisory lists the device's order or model number (Siemens order numbers
+  such as `6ES7 315-2EH14-0AB0`, Rockwell catalog numbers, Schneider references with wildcards)
+- **product name**: the device's model, such as `1756-ENBT`, appears in the advisory's product name
+- **product family**: the family the device's order or catalog number belongs to, such as S7-1200 or
+  MicroLogix 1400, appears in the advisory's product name, and the advisory lists no model numbers
+
+When an advisory lists the order numbers it covers, a device with a different order number doesn't
+match it. The device is **affected** when the firmware it reported is in the advisory's affected
+versions (`vers:intdot/<4.5.0`, `<= 5.008`, `>=7.80|<8.90` and the like), and **possibly affected**
+when its firmware wasn't seen or pyLot can't read the versions (about 8% of CISA's are free text).
+Only devices that reported their model can be checked, so capture while an engineering tool or a
+discovery scan talks to them. Treat every match as a lead and confirm it against the advisory: a
+family-level match in particular may concern only some models of that family.
+
 ### Zeek logs
 
 pyLot reads Zeek's `conn.log`, in the default tab-separated format or as JSON lines, and either one
@@ -188,6 +226,7 @@ pyLot has no authentication, so by default it only listens on 127.0.0.1. If you 
 listen elsewhere, anyone who can reach that address can use it; set `PYLOT_TRUSTED_HOSTS` to the
 names you'll browse to it by. Uploaded files are stored under random names, files that aren't captures
 or Zeek conn.logs are rejected, and requests that change data are refused when they come from other sites.
+pyLot only reaches the Internet when you click "Download from CISA" (or run `advisories.py fetch`).
 
 ## Fingerprints
 
@@ -215,6 +254,8 @@ The application uses SQLite (`pylot.sqlite3`) to store:
 - **l2_flows** and **mac_evidence**: traffic without IP, and what layer-2 protocols say about each MAC
 - **switches**, **switch_ports**, **switch_macs**, **switch_neighbors**: imported switch data, per session
 - **networks** and **settings**: named networks and automatic grouping, shared by all sessions
+- **advisories** and **advisory_products**: imported security advisories and the products they say
+  are affected, shared by all sessions
 
 The database is automatically created on first run.
 
@@ -228,6 +269,8 @@ The database is automatically created on first run.
   (`ip link` lists them)
 - **A session shows out-of-date results** (after updating pyLot or its fingerprints): use Re-analyze.
   Live captures aren't saved to a file, so they can't be re-analyzed
+- **"Download from CISA" fails**: pyLot needs HTTPS access to codeload.github.com. Download the
+  archive on another machine and import it on the Advisories page instead
 - **No identity shown for a PLC**: devices only report their model and firmware when asked. Capture
   while an engineering tool connects to them, or while EtherNet/IP or BACnet discovery runs
 - **Upload fails**: The error is shown on the upload page; details are in the server log. For Zeek,
@@ -247,6 +290,8 @@ The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
 - `alerts.py`: alert rules, worked out from a session's operations and flows when asked for
+- `advisories.py`: CSAF advisory import, version ranges and matching devices to advisories; also a
+  command-line importer
 - `parser/pcap_parser.py`: entry point that analyzes a capture or Zeek log
 - `parser/packets.py`: pcap/pcapng decoding (dpkt)
 - `parser/zeek.py`: Zeek conn.log reading

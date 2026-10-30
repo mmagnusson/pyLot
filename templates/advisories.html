@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Advisories - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page">
+    <nav class="top-nav"><a href="/">← Sessions</a> <a href="{{ url_for('networks_view') }}">Networks</a></nav>
+
+    <div class="card section">
+        <h1>Security advisories</h1>
+        <p class="hint">pyLot matches the vendor, model, order number and firmware that devices report in a capture against
+           security advisories in CSAF format, the format CISA publishes its ICS advisories in. Vendors such as Siemens,
+           Schneider Electric and Hitachi Energy publish CSAF advisories of their own, which can be imported too.
+           Each session's Vulnerabilities tab lists what matched.</p>
+        {% if message %}<p class="notice">{{ message }}</p>{% endif %}
+        {% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+        <div class="summary-grid">
+            <div class="stat-box"><strong>{{ '{:,}'.format(summary.advisories) }}</strong> advisories</div>
+            <div class="stat-box"><strong>{{ '{:,}'.format(summary.products) }}</strong> affected products</div>
+            {% if summary.newest %}<div class="stat-box">Newest: <strong>{{ summary.newest[:10] }}</strong></div>{% endif %}
+            {% if summary.imported_at %}<div class="stat-box">Last import: <strong>{{ summary.imported_at }}</strong> UTC</div>{% endif %}
+        </div>
+        {% if summary.publishers %}
+        <h2 style="margin-top: 20px">Publishers</h2>
+        <div class="table-wrap"><table class="data">
+            <thead><tr><th>Publisher</th><th style="text-align: right">Advisories</th></tr></thead>
+            <tbody>{% for p in summary.publishers %}<tr><td>{{ p.publisher }}</td><td class="num">{{ '{:,}'.format(p.advisories) }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+        {% endif %}
+    </div>
+
+    <div class="card section">
+        <h2>Download CISA's ICS advisories</h2>
+        <p class="hint">Downloads CISA's CSAF repository (about 12 MB, from GitHub) and imports its ICS and medical advisories.
+           Run it again to pick up new and updated advisories.</p>
+        <form method="post" action="{{ url_for('advisories_fetch') }}" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = 'Downloading…'">
+            <button type="submit" class="btn">Download from CISA</button>
+        </form>
+        <p class="hint">On a network without Internet access, download <code>{{ archive }}</code> on another machine and import it
+           below, or run <code>python advisories.py import FILE</code> on the pyLot machine.</p>
+    </div>
+
+    <div class="card section">
+        <h2>Import advisories</h2>
+        <form method="post" action="{{ url_for('advisories_import') }}" enctype="multipart/form-data" class="form-row">
+            <input type="file" name="advisory_file" multiple accept=".json,.zip,.tar,.gz,.tgz,application/json">
+            <button type="submit" class="btn">Import</button>
+        </form>
+        <p class="hint">CSAF 2.0 JSON files, or a .zip or .tar.gz of them. An advisory imported again replaces its older revision.</p>
+    </div>
+
+    {% if summary.advisories %}
+    <div class="card section">
+        <h2>Remove advisories</h2>
+        <form method="post" action="{{ url_for('advisories_delete') }}" onsubmit="return confirm('Remove every imported advisory?')">
+            <button type="submit" class="btn danger">Remove all advisories</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

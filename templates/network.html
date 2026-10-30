@@ -13,6 +13,7 @@
     <nav class="top-nav">
         <a href="/">← Sessions</a>
         <a href="{{ url_for('networks_view') }}">Networks</a>
+        <a href="{{ url_for('advisories_view') }}">Advisories</a>
         <a href="{{ url_for('compare_view', session_id=session.id) }}">Compare with a baseline</a>
     </nav>
 
@@ -23,6 +24,7 @@
             <div class="stat-box"><strong id="classified-count">…</strong> classified by fingerprints</div>
             <div class="stat-box"><strong id="edge-count">…</strong> host pairs talking</div>
             <a class="stat-box hidden" id="alert-box" href="#alerts"><strong id="alert-count"></strong> <span id="alert-label">alerts</span></a>
+            <a class="stat-box hidden" id="vuln-box" href="#vulnerabilities"><strong id="vuln-count"></strong> <span id="vuln-label">vulnerable devices</span></a>
             <div class="stat-box"><strong id="packet-count">{{ '{:,}'.format(session.packet_count) }}</strong> packets</div>
             <div class="stat-box">Status: <strong id="status">{{ session.status }}</strong></div>
             <form id="stop-form" method="post" action="{{ url_for('stop_capture', session_id=session.id) }}"
@@ -45,6 +47,7 @@
         <div class="tabs">
             <button class="tab active" data-tab="graph">Logical</button>
             <button class="tab" data-tab="alerts">Alerts</button>
+            <button class="tab" data-tab="vulnerabilities">Vulnerabilities</button>
             <button class="tab" data-tab="physical">Physical</button>
             <button class="tab" data-tab="hosts">Hosts</button>
             <button class="tab" data-tab="devices">Devices</button>
@@ -92,6 +95,25 @@
                stopped or restarted, control commands and writes, devices changed from several hosts, fuzzing, device enumeration and
                scans. Each alert covers one client and one device, however often it happened. Click one for details.</p>
             <div id="alerts-table"></div>
+        </div>
+
+        <div id="tab-vulnerabilities" class="tab-pane hidden">
+            <div class="toolbar">
+                <select id="vulns-status">
+                    <option value="">Affected and possibly affected</option>
+                    <option value="affected">Affected</option>
+                    <option value="possible">Possibly affected</option>
+                </select>
+                <input type="search" id="vulns-filter" placeholder="Search address, model, advisory or CVE..." style="width: 300px">
+                <span class="spacer"></span>
+                <a class="btn secondary" href="{{ url_for('advisories_view') }}">Manage advisories</a>
+                <a class="btn secondary" href="{{ url_for('export_vulnerabilities', session_id=session.id) }}">Vulnerabilities CSV</a>
+            </div>
+            <p class="hint tab-hint">Imported security advisories that name a device's vendor and model, matched by its order or model
+               number, its model name or its product family. A device is affected when the firmware it reported is in the advisory's
+               affected versions, and possibly affected when its firmware wasn't seen or pyLot can't read the versions. Treat each
+               match as a lead to confirm against the advisory. Click one for details.</p>
+            <div id="vulns-table"></div>
         </div>
 
         <div id="tab-physical" class="tab-pane hidden">

@@ -115,7 +115,7 @@
 <body>
     <div class="container">
         <h1>pyLot</h1>
-        <p style="text-align: center"><a href="{{ url_for('networks_view') }}">Networks</a></p>
+        <p style="text-align: center"><a href="{{ url_for('networks_view') }}">Networks</a> · <a href="{{ url_for('advisories_view') }}">Security advisories</a></p>
         {% if error %}
         <div class="error">{{ error }}</div>
         {% endif %}

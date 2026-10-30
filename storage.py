@@ -159,6 +159,28 @@ CREATE TABLE IF NOT EXISTS networks (           -- named networks, used to group
     name TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS advisories (           -- imported security advisories (CSAF), shared by every session
+    id TEXT PRIMARY KEY,                 -- the advisory's tracking id, e.g. ICSA-24-004-01
+    title TEXT NOT NULL,
+    publisher TEXT,
+    url TEXT,
+    released TEXT,                       -- first and latest release, ISO 8601
+    updated TEXT,
+    score REAL,                          -- highest CVSS base score
+    cves TEXT NOT NULL,                  -- comma-separated
+    imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS advisory_products (   -- the products an advisory says are affected
+    advisory_id TEXT NOT NULL REFERENCES advisories(id) ON DELETE CASCADE,
+    vendor TEXT NOT NULL,
+    product TEXT NOT NULL,               -- product family and name, as the advisory writes them
+    models TEXT,                         -- order or model numbers, space-separated
+    versions TEXT,                       -- the affected versions as written ('vers:intdot/<4.5.0', '<= 5.008'), NULL for all
+    cves TEXT NOT NULL,
+    score REAL,
+    fix TEXT                             -- the vendor's fix, when the advisory gives one
+);
+CREATE INDEX IF NOT EXISTS advisory_products_advisory ON advisory_products (advisory_id);
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL

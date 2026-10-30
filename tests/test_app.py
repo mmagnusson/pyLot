@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import tempfile
 
@@ -386,3 +387,55 @@ def test_alerts_api_csv_host_panel_and_compare(client):
     assert [a['rule'] for a in client.get('/api/sessions/2/hosts/10.0.0.3').get_json()['alerts']] == ['write']
     diff = client.get('/api/sessions/2/compare?baseline=1').get_json()
     assert [a['rule'] for a in diff['new_alerts']['items']] == ['write']
+
+# --- security advisories and vulnerabilities
+
+def import_advisory(client, document, name='advisory.json'):
+    return client.post('/advisories/import', data={'advisory_file': (io.BytesIO(json.dumps(document).encode()), name)})
+
+def controllogix_pcap(firmware):
+    from packet_builder import enip_list_identity_reply, udp_frame
+    return pcap_bytes([udp_frame('10.0.0.3', '10.0.0.57', 44818, 2000, enip_list_identity_reply(revision=firmware))])
+
+def test_advisories_page_imports_and_sessions_list_vulnerabilities(client):
+    from test_advisories import csaf
+    assert 'advisories' in client.get('/advisories').get_data(as_text=True)
+    advisory = csaf('ICSA-24-001-01', [('Rockwell Automation', 'ControlLogix 5570 controllers', '<= 20.054', ())],
+                    cves=(('CVE-2024-1111', 9.8),), title='Rockwell ControlLogix')
+    page = import_advisory(client, advisory)
+    assert page.status_code == 200 and 'Imported 1 new and 0 updated advisories.' in page.get_data(as_text=True)
+    upload(client, data=controllogix_pcap((20, 11)), name='old.pcap')
+    upload(client, data=controllogix_pcap((21, 3)), name='new.pcap')
+
+    data = client.get('/api/sessions/1/vulnerabilities').get_json()
+    assert data['advisories'] == 1 and data['counts'] == {'affected': 1, 'possible': 0, 'devices': 1}
+    [v] = data['vulnerabilities']
+    assert (v['ip'], v['advisory'], v['status'], v['match'], v['severity'], v['cves']) == (
+        '10.0.0.3', 'ICSA-24-001-01', 'affected', 'product family', 'critical', ['CVE-2024-1111'])
+    assert v['url'] == 'https://www.cisa.gov/news-events/ics-advisories/icsa-24-001-01'
+    assert client.get('/api/sessions/2/vulnerabilities').get_json()['vulnerabilities'] == []  # firmware 21.003 is fixed
+    assert [x['advisory'] for x in client.get('/api/sessions/1/hosts/10.0.0.3').get_json()['vulnerabilities']] == ['ICSA-24-001-01']
+    rows = client.get('/sessions/1/vulnerabilities.csv').data.decode().splitlines()
+    assert rows[0].startswith('status,severity,score,ip,module,vendor,model,firmware,advisory,title,cves')
+    assert rows[1].startswith('affected,critical,9.8,10.0.0.3,,Rockwell Automation/Allen-Bradley,1756-L71/B LOGIX5571,20.011,ICSA-24-001-01')
+    diff = client.get('/api/sessions/1/compare?baseline=2').get_json()
+    assert [x['advisory'] for x in diff['new_vulnerabilities']['items']] == ['ICSA-24-001-01']
+    assert client.get('/api/sessions/2/compare?baseline=1').get_json()['new_vulnerabilities']['total'] == 0
+
+    assert client.post('/advisories/delete').status_code == 200
+    assert client.get('/api/sessions/1/vulnerabilities').get_json() == {
+        'vulnerabilities': [], 'counts': {'affected': 0, 'possible': 0, 'devices': 0}, 'advisories': 0}
+
+def test_advisory_imports_that_hold_no_advisories(client):
+    assert client.post('/advisories/import', data={}).status_code == 400
+    assert import_advisory(client, {'document': {}}).status_code == 400
+    assert client.post('/advisories/import', data={'advisory_file': (io.BytesIO(b'\x00\x01'), 'x.bin')}).status_code == 400
+
+def test_fetching_advisories_without_internet(client, monkeypatch):
+    import urllib.error
+
+    def offline(conn):
+        raise urllib.error.URLError('Name or service not known')
+    monkeypatch.setattr(app_module.advisories, 'fetch_cisa', offline)
+    page = client.post('/advisories/fetch')
+    assert page.status_code == 502 and 'download the archive elsewhere' in page.get_data(as_text=True)

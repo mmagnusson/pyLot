@@ -13,7 +13,9 @@ import io
 import logging
 import os
 import sqlite3
+import urllib.error
 import uuid
+import advisories
 import alerts
 import storage
 
@@ -262,6 +264,8 @@ def session_host(session_id, ip):
     with db() as conn:
         _session_or_404(conn, session_id)
         host = storage.host_detail(conn, session_id, ip)
+        if host is not None:
+            host['vulnerabilities'] = advisories.match_hosts(conn, [host])
     if host is None:
         abort(404)
     return jsonify(host)
@@ -292,6 +296,16 @@ def session_alerts(session_id):
         found = alerts.session_alerts(conn, session_id)
     counts = {severity: sum(1 for a in found if a['severity'] == severity) for severity in alerts.SEVERITIES}
     return jsonify({'alerts': found, 'counts': counts})
+
+@app.route('/api/sessions/<int:session_id>/vulnerabilities')
+def session_vulnerabilities(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        found = advisories.session_vulnerabilities(conn, session_id)
+        imported = advisories.advisory_summary(conn)['advisories']
+    counts = {status: sum(1 for v in found if v['status'] == status) for status in advisories.STATUS_ORDER}
+    counts['devices'] = len({(v['ip'], v['module']) for v in found if v['status'] == 'affected'})
+    return jsonify({'vulnerabilities': found, 'counts': counts, 'advisories': imported})
 
 @app.route('/api/sessions/<int:session_id>/devices')
 def session_devices(session_id):
@@ -365,7 +379,65 @@ def compare_sessions(session_id):
         baseline = storage.get_session(conn, baseline_id) if baseline_id else None
         if baseline is None:
             return jsonify({'error': 'Choose a baseline session to compare with.'}), 400
-        return jsonify({'session': session, 'baseline': baseline, **storage.compare_sessions(conn, session_id, baseline_id)})
+        diff = storage.compare_sessions(conn, session_id, baseline_id)
+        known = {(v['ip'], v['module'], v['advisory']) for v in advisories.session_vulnerabilities(conn, baseline_id)}
+        new = [v for v in advisories.session_vulnerabilities(conn, session_id) if (v['ip'], v['module'], v['advisory']) not in known]
+    diff['new_vulnerabilities'] = {'items': new[:500], 'total': len(new)}
+    return jsonify({'session': session, 'baseline': baseline, **diff})
+
+# --- security advisories
+
+def advisories_page(message=None, error=None, status=200):
+    with db() as conn:
+        summary = advisories.advisory_summary(conn)
+    return render_template('advisories.html', summary=summary, message=message, error=error,
+                           archive=advisories.CISA_ARCHIVE), status
+
+def _import_message(counts):
+    message = f"Imported {counts['added']} new and {counts['updated']} updated advisories"
+    if counts['unchanged']:
+        message += f", {counts['unchanged']} already up to date"
+    if counts['skipped']:
+        message += f"; {counts['skipped']} files weren't CSAF advisories"
+    return message + '.'
+
+@app.route('/advisories')
+def advisories_view():
+    return advisories_page()
+
+@app.route('/advisories/import', methods=['POST'])
+def advisories_import():
+    files = [f for f in request.files.getlist('advisory_file') if f and f.filename]
+    if not files:
+        return advisories_page(error='Choose a CSAF file, or a .zip or .tar.gz of them.', status=400)
+
+    def documents():
+        for file in files:
+            yield from advisories.read_documents(file.filename, file.stream.read())
+    with db() as conn:
+        counts = advisories.import_advisories(conn, documents())
+    if not (counts['added'] or counts['updated'] or counts['unchanged']):
+        return advisories_page(error='No CSAF advisories found in that upload.', status=400)
+    return advisories_page(message=_import_message(counts))
+
+@app.route('/advisories/fetch', methods=['POST'])
+def advisories_fetch():
+    with db() as conn:
+        try:
+            counts = advisories.fetch_cisa(conn)
+        except (urllib.error.URLError, OSError, ValueError) as e:
+            logger.warning("Could not download CISA's advisories: %s", e)
+            return advisories_page(error=f"Could not download CISA's advisories: {e}. On a network without Internet access, "
+                                         "download the archive elsewhere and import it here.", status=502)
+    if not (counts['added'] or counts['updated'] or counts['unchanged']):
+        return advisories_page(error="The download from CISA held no advisories.", status=502)
+    return advisories_page(message=_import_message(counts))
+
+@app.route('/advisories/delete', methods=['POST'])
+def advisories_delete():
+    with db() as conn:
+        advisories.delete_advisories(conn)
+    return advisories_page(message='Removed every imported advisory.')
 
 # --- named networks and settings
 
@@ -475,6 +547,17 @@ def export_operations(session_id):
         _session_or_404(conn, session_id)
         operations, _ = storage.list_operations(conn, session_id)
     return _csv(operations, OPERATION_CSV_COLUMNS, f'session_{session_id}_operations.csv')
+
+VULNERABILITY_CSV_COLUMNS = ['status', 'severity', 'score', 'ip', 'module', 'vendor', 'model', 'firmware', 'advisory', 'title',
+                             'cves', 'product', 'versions', 'match', 'reason', 'fix', 'url']
+
+@app.route('/sessions/<int:session_id>/vulnerabilities.csv')
+def export_vulnerabilities(session_id):
+    with db() as conn:
+        _session_or_404(conn, session_id)
+        found = advisories.session_vulnerabilities(conn, session_id)
+    rows = [{**v, 'cves': '; '.join(v['cves'])} for v in found]
+    return _csv(rows, VULNERABILITY_CSV_COLUMNS, f'session_{session_id}_vulnerabilities.csv')
 
 DEVICE_CSV_COLUMNS = ['mac', 'vendor', 'name', 'ips', 'vlans', 'category', 'role', 'model', 'firmware', 'serial', 'layer2',
                       'switch', 'port', 'seen', 'packets', 'bytes', 'first_seen', 'last_seen']

@@ -1,7 +1,7 @@
 # pyLot progress notes
 
 Where the project stands and what comes next, so work can pick up on any machine. Last updated
-2026-10-28, at commit `6350a64` on `main`.
+2026-10-30.
 
 ## Goal
 
@@ -21,15 +21,14 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `1190940` | Roadmap 1 and 2: validated against 474 real ICS captures (fixes for crashes, PROFINET DCP, PVST+, vendor names, speed); Re-analyze buttons |
 | `c171e2a` | Roadmap 3 and 5: industrial protocol decoders (Modbus/UMAS, DNP3, S7comm, EtherNet/IP and CIP, IEC 104, BACnet, SNMP, banners) giving operations and asset identity (vendor, model, firmware, serial) |
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
+| (this branch) | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
 
-Tests: 177 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
+Tests: 215 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
 ## Roadmap: what's left
 
-The roadmap agreed after Phase 3, in its original numbering. 1 to 5 are done.
+The roadmap agreed after Phase 3, in its original numbering. 1 to 6 are done.
 
-6. **Vulnerability matching**: match vendor, model and firmware (now collected) against advisories,
-   such as CISA ICS advisories or NVD CPEs. Builds directly on item 5.
 7. **Persistent asset inventory**: assets that outlive sessions, merged across captures by MAC,
    serial or IP, with first and last seen and a history of identity changes.
 8. **Authentication and HTTPS**: logins and TLS. Needed before pyLot listens on anything but localhost.
@@ -40,7 +39,8 @@ The roadmap agreed after Phase 3, in its original numbering. 1 to 5 are done.
 11. **Deployment**: Docker image and a systemd unit.
 12. **Reports**: a printable or PDF summary of a session: assets, identity, alerts, changes since a baseline.
 
-Suggested next: 6 (it uses the identity data just added) or 8 (before opening pyLot to a network).
+Suggested next: 8 (before opening pyLot to a network) or 7 (an asset inventory would let vulnerabilities
+and identity carry across sessions).
 
 ## Known gaps in what's built
 
@@ -48,6 +48,15 @@ Suggested next: 6 (it uses the identity data just added) or 8 (before opening py
   - MMS / IEC 61850 is not decoded. Its identity replies would cover substation IEDs, and 21 of the test captures contain it.
   - Rockwell PCCC commands and S7comm-plus functions are recognised but not broken down.
 - **Alerts**: no way to dismiss an alert or allow-list expected activity (baseline comparison is the workaround), and no alert markers on the graph.
+- **Vulnerabilities**:
+  - Matching works from what devices report, so devices that never sent an identity reply aren't checked,
+    and layer-2-only devices (PROFINET DCP without IP) aren't matched yet.
+  - About 8% of CISA's version ranges are free text pyLot can't read; those matches are "possibly affected".
+  - Product-family matches use a small table in `advisories.py` (`FAMILIES`: Siemens S7 order numbers,
+    Rockwell catalog numbers); other vendors only match by model number or product name.
+  - CSAF relationships (a component installed on a product) are ignored, and NVD/CPE data isn't used.
+  - Checked against the real captures: ENBT, ControlLogix L61, MicroLogix 1400, S7-300, S7-1200 and
+    ET 200S all match the expected CISA advisories.
 - **Zeek imports**: no operations, identity or alerts, since conn.log has no payloads.
 - **Modbus identity**: Read Device Identification replies are covered only by unit tests; none of the test captures has a successful one.
 

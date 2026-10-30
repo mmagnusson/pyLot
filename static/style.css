@@ -365,6 +365,10 @@ textarea {
     background: #fff8e1;
     color: #8a6100;
 }
+.severity, .kind, .status-affected, .status-possible {
+    white-space: nowrap;
+    word-break: keep-all;
+}
 .severity {
     display: inline-block;
     padding: 1px 8px;
@@ -381,9 +385,20 @@ textarea {
     background: #f0ad4e;
     color: #3d2a00;
 }
-.severity-low {
+.severity-low, .severity-unknown {
     background: #e9ecef;
     color: #333;
+}
+.severity-critical {
+    background: #7b1d16;
+    color: white;
+}
+.status-affected {
+    color: #a52a1f;
+    font-weight: bold;
+}
+.status-possible {
+    color: #8a6100;
 }
 a.stat-box {
     color: inherit;
