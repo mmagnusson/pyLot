@@ -21,7 +21,7 @@
         }
         container.replaceChildren(table([
             { key: 'name', label: 'Name' }, { key: 'cidr', label: 'Network' },
-            { key: 'id', label: '', format: (id, network) => el('span', {},
+            { key: 'id', label: '', format: (id, network) => !pyLot.canEdit ? '' : el('span', {},
                 el('button', { class: 'link-btn', text: 'Rename', onclick: () => rename(network) }), ' · ',
                 el('button', { class: 'link-btn danger', text: 'Delete', onclick: () => remove(network) })) }
         ], networks));
@@ -44,7 +44,7 @@
         load();
     }
 
-    document.getElementById('add-form').addEventListener('submit', async event => {
+    document.getElementById('add-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const error = document.getElementById('add-error');
         error.textContent = '';
@@ -57,7 +57,7 @@
         }
     });
 
-    document.getElementById('settings-form').addEventListener('submit', async event => {
+    document.getElementById('settings-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const status = document.getElementById('settings-status');
         try {

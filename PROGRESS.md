@@ -22,16 +22,16 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `c171e2a` | Roadmap 3 and 5: industrial protocol decoders (Modbus/UMAS, DNP3, S7comm, EtherNet/IP and CIP, IEC 104, BACnet, SNMP, banners) giving operations and asset identity (vendor, model, firmware, serial) |
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
 | `d952794` | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
+| (this branch) | Roadmap 8: accounts with viewer/analyst/admin roles (web pages and `auth.py` CLI), sign-in limits, HTTPS (own cert, self-signed, or behind a proxy); refuses to listen beyond localhost without an account and HTTPS |
 
-Tests: 215 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
+Tests: 243 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
 ## Roadmap: what's left
 
-The roadmap agreed after Phase 3, in its original numbering. 1 to 6 are done.
+The roadmap agreed after Phase 3, in its original numbering. 1 to 6 and 8 are done.
 
 7. **Persistent asset inventory**: assets that outlive sessions, merged across captures by MAC,
    serial or IP, with first and last seen and a history of identity changes.
-8. **Authentication and HTTPS**: logins and TLS. Needed before pyLot listens on anything but localhost.
 9. **Capture rotation and performance**: long-running live capture with ring files, and faster
    analysis of multi-million-packet captures (fingerprint matching and dpkt dominate the time).
 10. **Switch formats beyond Cisco**: Hirschmann, Siemens SCALANCE, Moxa, Juniper and others for the
@@ -39,8 +39,8 @@ The roadmap agreed after Phase 3, in its original numbering. 1 to 6 are done.
 11. **Deployment**: Docker image and a systemd unit.
 12. **Reports**: a printable or PDF summary of a session: assets, identity, alerts, changes since a baseline.
 
-Suggested next: 8 (before opening pyLot to a network) or 7 (an asset inventory would let vulnerabilities
-and identity carry across sessions).
+Suggested next: 7 (an asset inventory would let vulnerabilities and identity carry across sessions), or 11
+(a production server: pyLot still runs on Flask's built-in one).
 
 ## Known gaps in what's built
 
@@ -57,6 +57,12 @@ and identity carry across sessions).
   - CSAF relationships (a component installed on a product) are ignored, and NVD/CPE data isn't used.
   - Checked against the real captures: ENBT, ControlLogix L61, MicroLogix 1400, S7-300, S7-1200 and
     ET 200S all match the expected CISA advisories.
+- **Accounts**:
+  - No audit log of who did what beyond sign-ins in the server log, no single sign-on (LDAP, SAML,
+    OIDC) and no API tokens for scripts (they would have to sign in with a cookie).
+  - The sign-in limit is per address and kept in memory, so it resets on restart.
+  - The session graph loads Cytoscape from CDNs, so on an isolated network its browser needs those
+    files served locally (worth fixing with item 11).
 - **Zeek imports**: no operations, identity or alerts, since conn.log has no payloads.
 - **Modbus identity**: Read Device Identification replies are covered only by unit tests; none of the test captures has a successful one.
 
@@ -71,8 +77,9 @@ venv/bin/python app.py            # http://127.0.0.1:5000
 
 - tshark/capinfos are only needed for cross-checking decoders. Live capture needs dumpcap and
   membership of the `wireshark` group.
-- Keep pyLot bound to 127.0.0.1 (the default) until roadmap item 8 is done; reach it remotely with
-  an SSH tunnel: `ssh -L 5000:127.0.0.1:5000 <user>@<host>`.
+- pyLot listens on 127.0.0.1 by default; reach it remotely with an SSH tunnel
+  (`ssh -L 5000:127.0.0.1:5000 <user>@<host>`), or add an account and serve HTTPS (see the README's
+  "Accounts and HTTPS").
 
 ### Test data
 

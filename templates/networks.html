@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+{% include '_account.html' %}
 <div class="page">
     <nav class="top-nav"><a href="/">← Sessions</a></nav>
 
@@ -14,12 +15,14 @@
         <p class="hint">Named networks group hosts in every session's graph, like GRASSMARLIN's logical networks.
            A host goes into the most specific network that contains it. Hosts in a named network are never
            merged into a "hosts via router" node.</p>
+        {% if can('analyst') %}
         <form id="add-form" class="form-row">
             <input type="text" id="cidr" placeholder="10.1.2.0/24" required style="width: 180px">
             <input type="text" id="name" placeholder="Name, e.g. Packaging line PLCs" maxlength="100" style="width: 280px">
             <button type="submit" class="btn">Add network</button>
         </form>
         <p id="add-error" class="error-text"></p>
+        {% endif %}
         <div id="networks"></div>
     </div>
 
@@ -28,7 +31,7 @@
         <form id="settings-form" class="form-row">
             <label>IPv4: group by <select id="auto_prefix_v4"></select></label>
             <label>IPv6: group by <select id="auto_prefix_v6"></select></label>
-            <button type="submit" class="btn secondary">Save</button>
+            {% if can('analyst') %}<button type="submit" class="btn secondary">Save</button>{% endif %}
             <span id="settings-status" class="hint"></span>
         </form>
         <p class="hint">Hosts reached through a router are grouped by that router instead.</p>

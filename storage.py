@@ -185,6 +185,14 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (       -- accounts; while there are none, pyLot asks no one to sign in
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('admin', 'analyst', 'viewer')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login TEXT
+);
 '''
 
 def _upsert(table, columns, key):

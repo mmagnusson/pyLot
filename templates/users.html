@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Users - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% include '_account.html' %}
+<div class="page">
+    <nav class="top-nav"><a href="/">← Sessions</a></nav>
+
+    <div class="card section">
+        <h1>Users</h1>
+        {% if message %}<p class="notice">{{ message }}</p>{% endif %}
+        {% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+        {% if users %}
+        <p class="hint">Viewers look at sessions and download exports. Analysts also upload captures, run live captures,
+           re-analyze and delete sessions and name networks. Admins also manage accounts and import security advisories.</p>
+        <div class="table-wrap"><table class="data">
+            <thead><tr><th>User</th><th>Role</th><th>Added (UTC)</th><th>Last signed in (UTC)</th><th></th></tr></thead>
+            <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.username }}{% if current_user and u.id == current_user.id %} <span class="hint">(you)</span>{% endif %}</td>
+                {% if current_user and u.id == current_user.id %}
+                <td>{{ u.role }}</td><td>{{ u.created_at }}</td><td>{{ u.last_login or 'never' }}</td>
+                <td><a href="{{ url_for('account_view') }}">Change your password</a></td>
+                {% else %}
+                <td>
+                    <form method="post" action="{{ url_for('users_role', user_id=u.id) }}" class="inline">
+                        <select name="role" onchange="this.form.submit()" aria-label="Role of {{ u.username }}">
+                            {% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == u.role else '' }}>{{ r }}</option>{% endfor %}
+                        </select>
+                        <noscript><button type="submit" class="link-btn">Save</button></noscript>
+                    </form>
+                </td>
+                <td>{{ u.created_at }}</td><td>{{ u.last_login or 'never' }}</td>
+                <td>
+                    <form method="post" action="{{ url_for('users_password', user_id=u.id) }}" class="inline">
+                        <input type="password" name="password" placeholder="New password" autocomplete="new-password"
+                               minlength="{{ min_length }}" required aria-label="New password for {{ u.username }}">
+                        <button type="submit" class="link-btn">Set password</button>
+                    </form>
+                    · <form method="post" action="{{ url_for('users_delete', user_id=u.id) }}" class="inline"
+                            onsubmit="return confirm('Remove the account {{ u.username }}?')">
+                        <button type="submit" class="link-btn danger">Remove</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}
+        <p>There are no accounts, so pyLot asks no one to sign in. That's fine while it only listens on this machine
+           (127.0.0.1, the default). Add an account and pyLot asks everyone to sign in; the first account is an admin.
+           pyLot won't listen on a network address until it has one.</p>
+        {% endif %}
+    </div>
+
+    <div class="card section">
+        <h2>{{ 'Add an account' if users else 'Add the first account' }}</h2>
+        <form method="post" action="{{ url_for('users_add') }}" class="stacked">
+            <label>User name <input type="text" name="username" maxlength="64" pattern="[A-Za-z0-9._@\-]+" autocomplete="off" required></label>
+            {% if users %}
+            <label>Role <select name="role">{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == 'analyst' else '' }}>{{ r }}</option>{% endfor %}</select></label>
+            {% endif %}
+            <label>Password <input type="password" name="password" autocomplete="new-password" minlength="{{ min_length }}" required></label>
+            <label>Password again <input type="password" name="confirm" autocomplete="new-password" minlength="{{ min_length }}" required></label>
+            <button type="submit" class="btn">Add account</button>
+        </form>
+        <p class="hint">Passwords need at least {{ min_length }} characters. Accounts can also be managed on the server with
+           <code>python auth.py</code>{% if not users %}, which is the only way while pyLot listens on a network address{% endif %}.</p>
+    </div>
+</div>
+</body>
+</html>

@@ -1,5 +1,6 @@
 import atexit
 import logging
+import os
 import re
 import subprocess
 import threading
@@ -16,6 +17,14 @@ SAVE_INTERVAL = 2.0  # seconds between incremental saves
 
 _running = {}  # session id -> dumpcap process, for captures in progress
 _running_lock = threading.Lock()
+
+def process_user():
+    """The account pyLot runs as, which is the one that needs capture rights."""
+    try:
+        import pwd
+        return pwd.getpwuid(os.geteuid()).pw_name
+    except (ImportError, KeyError, AttributeError):
+        return 'the account pyLot runs as'
 
 def list_interfaces():
     """Interface names dumpcap can capture on. Raises RuntimeError with the reason if it can't list them."""

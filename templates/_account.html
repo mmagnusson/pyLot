@@ -1,0 +1,11 @@
+{# Who is signed in, on every page; data-role tells the page scripts which controls to offer #}
+<div class="account-bar" data-role="{{ current_user.role if current_user else 'admin' }}">
+    {% if current_user %}
+    <span>{{ current_user.username }} <span class="hint">({{ current_user.role }})</span></span>
+    <a href="{{ url_for('account_view') }}">Account</a>
+    {% if can('admin') %}<a href="{{ url_for('users_view') }}">Users</a>{% endif %}
+    <form method="post" action="{{ url_for('logout') }}"><button type="submit" class="link-btn">Sign out</button></form>
+    {% elif not accounts and not config.REQUIRE_ACCOUNTS %}
+    <a href="{{ url_for('users_view') }}" title="No accounts yet, so pyLot asks no one to sign in">Accounts</a>
+    {% endif %}
+</div>

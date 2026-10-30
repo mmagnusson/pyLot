@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body data-session-id="{{ session.id }}">
+{% include '_account.html' %}
 <div class="page">
     <nav class="top-nav"><a href="/">← Sessions</a><a href="{{ url_for('session_view', session_id=session.id) }}">Back to {{ session.name }}</a></nav>
 

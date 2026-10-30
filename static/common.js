@@ -17,6 +17,9 @@ const pyLot = (() => {
 
     async function request(url, options = {}) {
         const response = await fetch(url, options);
+        if (response.status === 401) {  // signed out (expired, or the password changed): sign in and come back
+            location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`);
+        }
         const data = response.status === 204 ? {} : await response.json();
         if (!response.ok) throw new Error(data.error || response.statusText);
         return data;
@@ -36,5 +39,8 @@ const pyLot = (() => {
         return el('div', { class: 'table-wrap' }, el('table', { class: 'data' }, el('thead', {}, head), el('tbody', {}, ...body)));
     }
 
-    return { el, fmt, when, request, getJSON, sendJSON, table };
+    // Viewers can't change anything, so pages leave out the controls that would; the server checks too
+    const canEdit = document.querySelector('.account-bar')?.dataset.role !== 'viewer';
+
+    return { el, fmt, when, request, getJSON, sendJSON, table, canEdit };
 })();

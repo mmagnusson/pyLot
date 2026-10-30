@@ -1,4 +1,4 @@
-from flask import Flask, Response, render_template, request, redirect, url_for, jsonify, abort
+from flask import Flask, Response, render_template, request, redirect, url_for, jsonify, abort, g, session
 from werkzeug.utils import secure_filename
 from parser import zeek
 from parser.pcap_parser import CAPTURE_MAGIC_NUMBERS, check_file, parse_file
@@ -6,17 +6,20 @@ from parser import switch_config
 from capture import live_capture
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from datetime import timedelta
 from urllib.parse import urlsplit
 import argparse
 import csv
 import io
 import logging
 import os
+import socket
 import sqlite3
 import urllib.error
 import uuid
 import advisories
 import alerts
+import auth
 import storage
 
 logger = logging.getLogger(__name__)
@@ -41,6 +44,16 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Initialize database on startup
 storage.init_db(DB_PATH)
 
+# Sign-in (see auth.py): a signed session cookie, sent to this site only, never readable by scripts
+with closing(storage.connect(DB_PATH)) as _conn:
+    app.secret_key = os.environ.get('PYLOT_SECRET_KEY') or auth.secret_key(_conn)
+app.config.update(SESSION_COOKIE_NAME='pylot_session', SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax',
+                  PERMANENT_SESSION_LIFETIME=timedelta(hours=float(os.environ.get('PYLOT_SESSION_HOURS', '12'))),
+                  # Set when listening beyond this machine: with no accounts, refuse requests rather than serve everyone
+                  REQUIRE_ACCOUNTS=False)
+login_throttle = auth.LoginThrottle()
+PUBLIC_ENDPOINTS = {'login', 'static'}
+
 # Uploads are analyzed one at a time in the background, so requests return immediately
 analysis_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='analysis')
 
@@ -60,10 +73,64 @@ def reject_cross_site_posts():
     if source is not None and urlsplit(source).netloc != request.host:
         abort(403)
 
+def requires(role):
+    """Routes need a viewer to read and an analyst to change anything; this raises the bar for one route."""
+    def mark(view):
+        view.required_role = role
+        return view
+    return mark
+
+def _wants_json():
+    return request.path.startswith('/api/') or request.path.endswith('.csv')
+
+def _refuse(message, status):
+    if _wants_json():
+        return jsonify({'error': message}), status
+    return render_template('message.html', title='Not allowed' if status == 403 else 'Unavailable', message=message), status
+
+@app.before_request
+def require_sign_in():
+    g.user = None
+    g.accounts = False
+    if request.endpoint is None or request.endpoint in PUBLIC_ENDPOINTS:
+        return
+    with db() as conn:
+        g.accounts = auth.has_users(conn)
+        if not g.accounts:
+            if app.config['REQUIRE_ACCOUNTS']:
+                return _refuse('pyLot has no accounts yet. Add one on the server with: python auth.py add NAME', 503)
+            return
+        user = auth.get_user(conn, session.get('user_id'))
+    if user is None or session.get('token') != auth.session_token(user):
+        session.clear()
+        if _wants_json() or request.method != 'GET':
+            return jsonify({'error': 'Sign in first.'}), 401
+        return redirect(url_for('login', next=request.full_path.rstrip('?')))
+    g.user = user
+    view = app.view_functions[request.endpoint]
+    required = getattr(view, 'required_role', 'viewer' if request.method in ('GET', 'HEAD') else 'analyst')
+    if not auth.allowed(user['role'], required):
+        return _refuse(f"Your account ({user['role']}) can't do that; it needs the {required} role.", 403)
+
+@app.after_request
+def security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'same-origin')
+    if g.get('user') and request.endpoint != 'static':
+        response.headers.setdefault('Cache-Control', 'no-store')  # signed-in pages stay out of shared caches
+    return response
+
+@app.context_processor
+def account_context():
+    user = g.get('user')
+    return {'current_user': user, 'accounts': g.get('accounts', False),
+            'can': lambda role: user is None or auth.allowed(user['role'], role)}
+
 def index_error(message, status=400):
     with db() as conn:
         sessions = storage.list_sessions(conn)
-    return render_template('index.html', error=message, sessions=sessions), status
+    return render_template('index.html', error=message, sessions=sessions, capture_user=live_capture.process_user()), status
 
 @app.errorhandler(413)
 def upload_too_large(e):
@@ -73,7 +140,7 @@ def upload_too_large(e):
 @app.route('/')
 def index():
     with db() as conn:
-        return render_template('index.html', sessions=storage.list_sessions(conn))
+        return render_template('index.html', sessions=storage.list_sessions(conn), capture_user=live_capture.process_user())
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -406,6 +473,7 @@ def advisories_view():
     return advisories_page()
 
 @app.route('/advisories/import', methods=['POST'])
+@requires('admin')
 def advisories_import():
     files = [f for f in request.files.getlist('advisory_file') if f and f.filename]
     if not files:
@@ -421,6 +489,7 @@ def advisories_import():
     return advisories_page(message=_import_message(counts))
 
 @app.route('/advisories/fetch', methods=['POST'])
+@requires('admin')
 def advisories_fetch():
     with db() as conn:
         try:
@@ -434,12 +503,160 @@ def advisories_fetch():
     return advisories_page(message=_import_message(counts))
 
 @app.route('/advisories/delete', methods=['POST'])
+@requires('admin')
 def advisories_delete():
     with db() as conn:
         advisories.delete_advisories(conn)
     return advisories_page(message='Removed every imported advisory.')
 
 # --- named networks and settings
+
+def _safe_next(target):
+    """Only paths on this site, so a sign-in link can't send someone elsewhere afterwards."""
+    if target and target.startswith('/') and not target.startswith('//') and '\\' not in target:
+        return target
+    return url_for('index')
+
+def _sign_in(user):
+    session.clear()
+    session.permanent = True
+    session['user_id'] = user['id']
+    session['token'] = auth.session_token(user)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    with db() as conn:
+        accounts = auth.has_users(conn)
+    next_page = _safe_next(request.values.get('next'))
+    if not accounts:
+        return redirect(url_for('users_view'))
+    if request.method == 'GET':
+        return render_template('login.html', next=next_page)
+    address = request.remote_addr or ''
+    wait = login_throttle.blocked(address)
+    if wait:
+        return render_template('login.html', next=next_page,
+                               error=f'Too many failed sign-ins. Try again in {(wait + 59) // 60} minutes.'), 429
+    username = request.form.get('username', '').strip()
+    with db() as conn:
+        user = auth.verify(conn, username, request.form.get('password', ''))
+        if user:
+            auth.record_login(conn, user['id'])
+    if user is None:
+        login_throttle.failed(address)
+        logger.warning('Failed sign-in for %r from %s', username, address)
+        return render_template('login.html', next=next_page, username=username, error='Wrong user name or password.'), 401
+    login_throttle.succeeded(address)
+    logger.info('%s signed in from %s', user['username'], address)
+    _sign_in(user)
+    return redirect(next_page)
+
+@app.route('/logout', methods=['POST'])
+@requires('viewer')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+def account_page(message=None, error=None, status=200):
+    return render_template('account.html', message=message, error=error, min_length=auth.MIN_PASSWORD_LENGTH), status
+
+@app.route('/account')
+def account_view():
+    if g.user is None:
+        return redirect(url_for('users_view'))
+    return account_page()
+
+@app.route('/account/password', methods=['POST'])
+@requires('viewer')
+def account_password():
+    if g.user is None:
+        return redirect(url_for('users_view'))
+    form = request.form
+    with db() as conn:
+        if not auth.verify(conn, g.user['username'], form.get('current', '')):
+            return account_page(error='Your current password is wrong.', status=400)
+        if form.get('password') != form.get('confirm'):
+            return account_page(error="The new passwords don't match.", status=400)
+        try:
+            auth.set_password(conn, g.user['id'], form.get('password'))
+        except auth.AccountError as e:
+            return account_page(error=f'{str(e).capitalize()}.', status=400)
+        _sign_in(auth.get_user(conn, g.user['id']))  # this browser stays signed in; others are signed out
+    return account_page(message='Password changed. Browsers signed in with the old one have been signed out.')
+
+def users_page(message=None, error=None, status=200):
+    with db() as conn:
+        users = auth.list_users(conn)
+    return render_template('users.html', users=users, roles=auth.ROLES, message=message, error=error,
+                           min_length=auth.MIN_PASSWORD_LENGTH), status
+
+@app.route('/users')
+@requires('admin')
+def users_view():
+    return users_page()
+
+@app.route('/users', methods=['POST'])
+@requires('admin')
+def users_add():
+    form = request.form
+    if form.get('password') != form.get('confirm'):
+        return users_page(error="The passwords don't match.", status=400)
+    with db() as conn:
+        first = not auth.has_users(conn)
+        role = 'admin' if first else form.get('role')
+        try:
+            user = auth.add_user(conn, form.get('username', '').strip(), form.get('password'), role)
+        except auth.AccountError as e:
+            return users_page(error=f'{str(e).capitalize()}.', status=400)
+        if first:
+            # Whoever made the first account is now asked to sign in like everyone else, so sign them in as it
+            _sign_in(auth.get_user(conn, user['id']))
+            auth.record_login(conn, user['id'])
+            g.user, g.accounts = auth.get_user(conn, user['id']), True
+    logger.info('Account %s (%s) added by %s', user['username'], user['role'], g.user['username'])
+    return users_page(message=f"Added {user['username']} ({user['role']})."
+                              + (' pyLot now asks everyone to sign in, and you are signed in as this account.' if first else ''))
+
+def _other_account(conn, user_id, action):
+    user = auth.get_user(conn, user_id)
+    if user is None:
+        abort(404)
+    if user['id'] == g.user['id']:
+        raise auth.AccountError(f"you can't {action} your own account here")
+    return user
+
+@app.route('/users/<int:user_id>/role', methods=['POST'])
+@requires('admin')
+def users_role(user_id):
+    with db() as conn:
+        try:
+            user = _other_account(conn, user_id, 'change the role of')
+            auth.set_role(conn, user_id, request.form.get('role'))
+        except auth.AccountError as e:
+            return users_page(error=f'{str(e).capitalize()}.', status=400)
+    return users_page(message=f"{user['username']} is now {request.form.get('role')}.")
+
+@app.route('/users/<int:user_id>/password', methods=['POST'])
+@requires('admin')
+def users_password(user_id):
+    with db() as conn:
+        try:
+            user = _other_account(conn, user_id, 'reset the password of')
+            auth.set_password(conn, user_id, request.form.get('password'))
+        except auth.AccountError as e:
+            return users_page(error=f'{str(e).capitalize()}.', status=400)
+    return users_page(message=f"Set a new password for {user['username']}; they have been signed out.")
+
+@app.route('/users/<int:user_id>/delete', methods=['POST'])
+@requires('admin')
+def users_delete(user_id):
+    with db() as conn:
+        try:
+            user = _other_account(conn, user_id, 'remove')
+            auth.remove_user(conn, user_id)
+        except auth.AccountError as e:
+            return users_page(error=f'{str(e).capitalize()}.', status=400)
+    return users_page(message=f"Removed {user['username']}.")
 
 @app.route('/networks')
 def networks_view():
@@ -572,13 +789,14 @@ def export_devices(session_id):
     return _csv(rows, DEVICE_CSV_COLUMNS, f'session_{session_id}_devices.csv')
 
 @app.route('/api/interfaces')
+@requires('analyst')
 def interfaces():
     try:
         return jsonify({'interfaces': live_capture.list_interfaces()})
     except RuntimeError as e:
         return jsonify({'interfaces': [], 'error': str(e)})
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description='pyLot passive ICS network mapper')
     parser.add_argument('--host', default='127.0.0.1', help='address to listen on (default: 127.0.0.1)')
     parser.add_argument('--port', type=int, default=5000, help='port to listen on (default: 5000)')
@@ -586,22 +804,75 @@ def parse_args():
                         help='also start capturing live traffic on this interface (captures can also be started from the web page)')
     parser.add_argument('--capture-filter', metavar='BPF',
                         help='only capture traffic matching this capture filter, e.g. "not port 22"')
+    tls = parser.add_argument_group('HTTPS (needed to listen on anything but this machine)')
+    tls.add_argument('--cert', metavar='FILE', help='serve HTTPS with this PEM certificate (and chain)')
+    tls.add_argument('--key', metavar='FILE', help="the certificate's PEM private key")
+    tls.add_argument('--self-signed', action='store_true',
+                     help=f'serve HTTPS with a self-signed certificate, made in {os.path.join(BASE_DIR, "tls")} on first use')
+    tls.add_argument('--behind-proxy', action='store_true',
+                     help='a reverse proxy on this machine serves HTTPS and forwards to pyLot; trust its X-Forwarded headers')
     parser.add_argument('--debug', action='store_true',
-                        help='enable the Flask debugger and auto-reload (never on a shared network)')
-    return parser.parse_args()
+                        help='enable the Flask debugger and auto-reload (this machine only)')
+    args = parser.parse_args(argv)
+    if bool(args.cert) != bool(args.key):
+        parser.error('--cert and --key go together')
+    if sum(map(bool, (args.cert, args.self_signed, args.behind_proxy))) > 1:
+        parser.error('choose one of --cert/--key, --self-signed and --behind-proxy')
+    return args
+
+def configure_serving(args):
+    """
+    Check that it's safe to serve as asked and set up for it. Returns the ssl_context for app.run.
+    Raises SystemExit with the reason when it isn't safe.
+    """
+    networked = args.host not in LOOPBACK_HOSTS or args.behind_proxy
+    if networked:
+        if args.debug:
+            raise SystemExit("--debug runs code typed into its error pages, so it only works on this machine (127.0.0.1)")
+        with db() as conn:
+            if not auth.has_users(conn):
+                raise SystemExit("Add an account before pyLot listens beyond this machine: python auth.py add NAME")
+        if not (args.cert or args.self_signed or args.behind_proxy):
+            raise SystemExit("pyLot needs HTTPS to listen beyond this machine, so passwords aren't sent in the clear: "
+                             "give --cert and --key, or --self-signed, or --behind-proxy for a reverse proxy that serves HTTPS")
+        app.config['REQUIRE_ACCOUNTS'] = True
+        if args.host not in ('0.0.0.0', '::') and args.host not in LOOPBACK_HOSTS and 'PYLOT_TRUSTED_HOSTS' not in os.environ:
+            app.config['TRUSTED_HOSTS'].append(args.host)
+
+    ssl_context = None
+    if args.cert:
+        ssl_context = (args.cert, args.key)
+    elif args.self_signed:
+        names = [socket.gethostname(), socket.getfqdn(), *app.config['TRUSTED_HOSTS']]
+        if args.host not in ('0.0.0.0', '::'):
+            names.append(args.host)
+        try:
+            cert, key, created = auth.self_signed_certificate(os.path.join(BASE_DIR, 'tls'), names)
+        except RuntimeError as e:
+            raise SystemExit(str(e))
+        logger.info("%s self-signed certificate %s. Browsers will warn about it; check that it shows this "
+                    "SHA-256 fingerprint before accepting it: %s", 'Made' if created else 'Using', cert,
+                    auth.certificate_fingerprint(cert))
+        ssl_context = (cert, key)
+    elif args.behind_proxy:
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        # The proxy's headers give the browser's address (for sign-in limits), the scheme and the host it asked for
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    if ssl_context or args.behind_proxy:
+        app.config['SESSION_COOKIE_SECURE'] = True
+    return ssl_context
 
 if __name__ == '__main__':
     args = parse_args()
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
                         format='%(asctime)s %(levelname)s %(name)s: %(message)s')
-
-    if args.host not in LOOPBACK_HOSTS:
-        logger.warning("Listening on %s. pyLot has no authentication: anyone who can reach this address can use it.", args.host)
-        if args.host not in ('0.0.0.0', '::') and 'PYLOT_TRUSTED_HOSTS' not in os.environ:
-            app.config['TRUSTED_HOSTS'].append(args.host)
+    ssl_context = configure_serving(args)
+    with db() as conn:
+        if not auth.has_users(conn):
+            logger.info("No accounts, so pyLot doesn't ask anyone to sign in. Add one on the Accounts page or with: python auth.py add NAME")
 
     # With --debug the reloader runs this file twice; only capture in the process that serves requests
     if args.capture_interface and (not args.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true'):
         live_capture.launch(args.capture_interface, DB_PATH, args.capture_filter)
 
-    app.run(host=args.host, port=args.port, debug=args.debug)
+    app.run(host=args.host, port=args.port, debug=args.debug, ssl_context=ssl_context)

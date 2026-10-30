@@ -435,3 +435,35 @@ a.stat-box {
         border-top: 1px solid #dee2e6;
     }
 }
+.account-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+    margin: -10px 0 10px;
+}
+.account-bar form, form.inline {
+    display: inline;
+}
+.page.narrow {
+    max-width: 480px;
+}
+form.stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 360px;
+}
+form.stacked label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+form.stacked input, form.stacked select {
+    padding: 6px 8px;
+    font-size: 14px;
+}
+form.stacked .btn {
+    align-self: flex-start;
+}

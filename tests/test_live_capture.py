@@ -96,3 +96,6 @@ def test_launch_runs_in_the_background_and_stop_needs_a_running_capture(db_path,
             thread.join(timeout=5)
     assert started == [('eth9', db_path, None, session_id)]
     assert live_capture.stop(session_id) is False and not live_capture.is_running(session_id)
+
+def test_the_process_user_is_named():
+    assert live_capture.process_user() and isinstance(live_capture.process_user(), str)

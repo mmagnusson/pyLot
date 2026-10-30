@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Sign in - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page narrow">
+    <div class="card section">
+        <h1>pyLot</h1>
+        {% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+        <form method="post" action="{{ url_for('login') }}" class="stacked">
+            <input type="hidden" name="next" value="{{ next }}">
+            <label>User name <input type="text" name="username" value="{{ username or '' }}" autocomplete="username" required autofocus></label>
+            <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+            <button type="submit" class="btn">Sign in</button>
+        </form>
+        <p class="hint">Forgotten your password? An admin can set a new one, or on the server: <code>python auth.py passwd NAME</code></p>
+    </div>
+</div>
+</body>
+</html>

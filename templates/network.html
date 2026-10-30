@@ -10,6 +10,7 @@
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
 </head>
 <body data-session-id="{{ session.id }}">
+    {% include '_account.html' %}
     <nav class="top-nav">
         <a href="/">← Sessions</a>
         <a href="{{ url_for('networks_view') }}">Networks</a>
@@ -27,6 +28,7 @@
             <a class="stat-box hidden" id="vuln-box" href="#vulnerabilities"><strong id="vuln-count"></strong> <span id="vuln-label">vulnerable devices</span></a>
             <div class="stat-box"><strong id="packet-count">{{ '{:,}'.format(session.packet_count) }}</strong> packets</div>
             <div class="stat-box">Status: <strong id="status">{{ session.status }}</strong></div>
+            {% if can('analyst') %}
             <form id="stop-form" method="post" action="{{ url_for('stop_capture', session_id=session.id) }}"
                   class="{{ '' if session.status == 'capturing' else 'hidden' }}">
                 <button type="submit" class="btn danger">Stop capture</button>
@@ -37,6 +39,7 @@
                   onsubmit="return confirm('Analyze this file again with the current fingerprints and decoders? Imported switch data is kept.')">
                 <button type="submit" class="btn secondary" title="Analyze the uploaded file again with the current fingerprints and decoders">Re-analyze</button>
             </form>
+            {% endif %}
             {% endif %}
         </div>
         <div class="legend" id="legend"></div>
@@ -129,6 +132,7 @@
                 <aside>
                     <h3>Imported switches</h3>
                     <ul id="switch-list" class="switch-list"></ul>
+                    {% if can('analyst') %}
                     <h3>Import switch data</h3>
                     <form id="switch-form">
                         <p class="hint">Cisco IOS or NX-OS output of <code>show running-config</code>, <code>show mac address-table</code>
@@ -142,6 +146,7 @@
                         </div>
                         <p id="switch-error" class="error-text"></p>
                     </form>
+                    {% endif %}
                     <p class="hint">Without imports, the view shows what the capture itself reveals: the switch and port that
                        LLDP or CDP announced to the capture point, and every device's VLAN. Faded devices are only in a MAC table.</p>
                 </aside>

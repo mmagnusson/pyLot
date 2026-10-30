@@ -40,6 +40,8 @@ Python web application.
   operations, new alerts and vulnerabilities, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
   and CSV exports
+- Accounts with viewer, analyst and admin roles, and HTTPS (your certificate, a self-signed one, or a
+  reverse proxy), required before pyLot listens on anything but the machine it runs on
 
 ## Installation
 
@@ -77,8 +79,10 @@ Python web application.
    python app.py --capture-interface enp3s0   # also start capturing live traffic right away
    python app.py --capture-interface enp3s0 --capture-filter "not port 22"
    python app.py --debug                      # Flask debugger and auto-reload, local use only
+   python app.py --host 0.0.0.0 --self-signed # serve other machines over HTTPS (needs an account first)
    ```
-   Run `python app.py --help` for all options.
+   Run `python app.py --help` for all options. To use pyLot from other machines, see
+   [Accounts and HTTPS](#accounts-and-https).
 
 2. **Access the web interface:**
    - Open http://127.0.0.1:5000 in your browser
@@ -211,6 +215,45 @@ IEC 104 and others). MAC addresses are used when Zeek logged them, which it does
 `policy/protocols/conn/mac-logging` script is loaded. Other Zeek logs (`dns.log`, `http.log` and so on)
 are rejected.
 
+### Accounts and HTTPS
+
+Until you add an account, pyLot asks no one to sign in, which suits one analyst on their own machine:
+it only listens on 127.0.0.1 unless told otherwise. Once there is an account, everyone signs in. Add
+the first one on the Accounts page (the link at the top right) or on the server:
+
+```bash
+python auth.py add alice                  # the first account is an admin; asks for a password
+python auth.py add bob --role viewer
+python auth.py list                       # also: passwd NAME, role NAME ROLE, remove NAME
+```
+
+| Role | Can |
+|---|---|
+| viewer | look at sessions, advisories and networks, and download exports |
+| analyst | also upload captures, run live captures, re-analyze and delete sessions, import switch data and name networks |
+| admin | also manage accounts (the Users page) and download or import security advisories |
+
+Admins manage accounts on the Users page; everyone changes their own password on the Account page.
+Changing a password or removing an account signs out the browsers using it. Passwords need at least
+12 characters, and an address that fails to sign in 10 times in 15 minutes has to wait.
+
+To listen on a network address, pyLot needs an account and HTTPS, and won't start without them:
+
+```bash
+python app.py --host 0.0.0.0 --self-signed            # makes tls/cert.pem and tls/key.pem on first use
+python app.py --host 10.1.2.3 --cert cert.pem --key key.pem
+python app.py --behind-proxy                          # nginx, Caddy etc. serve HTTPS and forward to 127.0.0.1:5000
+```
+
+With `--self-signed`, browsers warn that they don't know the certificate. The server log prints its
+SHA-256 fingerprint; check that the browser shows the same one before accepting it. Delete `tls/` to
+make a new certificate (for instance after the machine's name changes). Set `PYLOT_TRUSTED_HOSTS` to
+the names and addresses you'll browse to pyLot by. Behind a proxy, pyLot trusts its `X-Forwarded-For`,
+`-Proto` and `-Host` headers, so only use `--behind-proxy` when the proxy is the only way in.
+
+`app.py` serves with Flask's built-in server, which is fine for a handful of users; a production
+deployment (Docker, systemd) is on the roadmap.
+
 ## Configuration
 
 | Environment variable | Default | Purpose |
@@ -219,12 +262,17 @@ are rejected.
 | `PYLOT_TRUSTED_HOSTS` | `localhost,127.0.0.1` | Host names the app answers to; other `Host` headers get a 400 |
 | `PYLOT_DB_PATH` | `pylot.sqlite3` in the app directory | Session database |
 | `PYLOT_UPLOAD_FOLDER` | `uploads/` in the app directory | Where uploaded captures and logs are kept |
+| `PYLOT_SESSION_HOURS` | `12` | How long a sign-in lasts without using pyLot |
+| `PYLOT_SECRET_KEY` | made on first run, kept in the database | Key that signs sign-in cookies; changing it signs everyone out |
 
 ## Security
 
-pyLot has no authentication, so by default it only listens on 127.0.0.1. If you pass `--host` to
-listen elsewhere, anyone who can reach that address can use it; set `PYLOT_TRUSTED_HOSTS` to the
-names you'll browse to it by. Uploaded files are stored under random names, files that aren't captures
+By default pyLot only listens on 127.0.0.1 and, until you add an account, asks no one to sign in. It
+won't listen on a network address without an account and HTTPS, or with `--debug`. Passwords are
+stored as salted scrypt hashes. Sign-ins use a signed cookie that page scripts can't read, that
+browsers don't send with other sites' form posts, and that is only sent over HTTPS when pyLot serves HTTPS. Pages refuse to be
+framed by other sites. Requests whose `Host` isn't in `PYLOT_TRUSTED_HOSTS` are refused, which blocks
+DNS rebinding. Failed sign-ins are logged with the user name and address. Uploaded files are stored under random names, files that aren't captures
 or Zeek conn.logs are rejected, and requests that change data are refused when they come from other sites.
 pyLot only reaches the Internet when you click "Download from CISA" (or run `advisories.py fetch`).
 
@@ -254,6 +302,8 @@ The application uses SQLite (`pylot.sqlite3`) to store:
 - **l2_flows** and **mac_evidence**: traffic without IP, and what layer-2 protocols say about each MAC
 - **switches**, **switch_ports**, **switch_macs**, **switch_neighbors**: imported switch data, per session
 - **networks** and **settings**: named networks and automatic grouping, shared by all sessions
+  (settings also holds the key that signs sign-in cookies)
+- **users**: accounts, with salted password hashes, roles and when each last signed in
 - **advisories** and **advisory_products**: imported security advisories and the products they say
   are affected, shared by all sessions
 
@@ -265,8 +315,9 @@ The database is automatically created on first run.
   mode, port channels and CDP/LLDP neighbors. Include `show running-config` and the neighbors output
   so it can tell them apart
 - **Live capture fails**: The session shows dumpcap's error. Usually you need to be in the
-  wireshark group (log out and back in after adding yourself) or the interface name is wrong
-  (`ip link` lists them)
+  wireshark group (log out and back in after adding yourself, then restart pyLot, or start it with
+  `sg wireshark -c "venv/bin/python app.py"`) or the interface name is wrong (`ip link` lists them).
+  The sessions page shows these steps under "How to enable live capture" when dumpcap can't run
 - **A session shows out-of-date results** (after updating pyLot or its fingerprints): use Re-analyze.
   Live captures aren't saved to a file, so they can't be re-analyzed
 - **"Download from CISA" fails**: pyLot needs HTTPS access to codeload.github.com. Download the
@@ -276,6 +327,12 @@ The database is automatically created on first run.
 - **Upload fails**: The error is shown on the upload page; details are in the server log. For Zeek,
   upload `conn.log` itself, not another log or a directory archive
 - **400 Bad Request when browsing by hostname or IP**: Add that name to `PYLOT_TRUSTED_HOSTS`
+- **Forgotten password, or locked out**: on the server, `python auth.py passwd NAME` sets a new
+  password, and `python auth.py role NAME admin` restores admin rights. A refused sign-in after many
+  failures clears itself within 15 minutes, or when pyLot restarts
+- **The browser warns about the certificate**: expected with `--self-signed`; compare the fingerprint
+  in the server log with the one the browser shows. Use `--cert` and `--key` with a certificate from
+  your organization's CA to avoid the warning
 - **Very large captures**: Analysis runs at roughly 5,000 to 15,000 packets a second in the
   background, one upload at a time; a 2.3-million-packet capture takes about three minutes. Captures
   full of scans can hold millions of flows, which makes the graph and baseline comparisons take
@@ -289,6 +346,8 @@ Where the project stands and what's planned next is in `PROGRESS.md`.
 The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
+- `auth.py`: accounts, roles, sign-in limits and self-signed certificates; also the command-line
+  account manager
 - `alerts.py`: alert rules, worked out from a session's operations and flows when asked for
 - `advisories.py`: CSAF advisory import, version ranges and matching devices to advisories; also a
   command-line importer

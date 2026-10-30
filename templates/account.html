@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Account - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% include '_account.html' %}
+<div class="page narrow">
+    <nav class="top-nav"><a href="/">← Sessions</a></nav>
+    <div class="card section">
+        <h1>{{ current_user.username }}</h1>
+        <p class="hint">Role: {{ current_user.role }}. Last signed in {{ current_user.last_login or 'never' }} UTC.</p>
+        {% if message %}<p class="notice">{{ message }}</p>{% endif %}
+        {% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+        <h2>Change password</h2>
+        <form method="post" action="{{ url_for('account_password') }}" class="stacked">
+            <input type="text" name="username" value="{{ current_user.username }}" autocomplete="username" hidden>
+            <label>Current password <input type="password" name="current" autocomplete="current-password" required></label>
+            <label>New password <input type="password" name="password" autocomplete="new-password" minlength="{{ min_length }}" required></label>
+            <label>New password again <input type="password" name="confirm" autocomplete="new-password" minlength="{{ min_length }}" required></label>
+            <button type="submit" class="btn">Change password</button>
+        </form>
+        <p class="hint">At least {{ min_length }} characters. Browsers signed in with the old password are signed out.</p>
+    </div>
+</div>
+</body>
+</html>

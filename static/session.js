@@ -60,7 +60,7 @@
         }
         setText('status', session.status);
         setText('packet-count', fmt(session.packet_count));
-        document.getElementById('stop-form').classList.toggle('hidden', session.status !== 'capturing');
+        document.getElementById('stop-form')?.classList.toggle('hidden', session.status !== 'capturing');
         const reanalyze = document.getElementById('reanalyze-form');
         if (reanalyze) reanalyze.classList.toggle('hidden', !['ready', 'failed'].includes(session.status));
         document.getElementById('refresh').classList.toggle('hidden', session.status !== 'capturing');
@@ -609,6 +609,10 @@
                 : 'Addresses that are not single hosts.' }));
             return;
         }
+        if (!pyLot.canEdit) {
+            openPanel(group.label, facts(rows), el('p', { class: 'hint', text: 'Grouped automatically by address. An analyst can give it a name.' }));
+            return;
+        }
         const cidr = el('input', { type: 'text', value: group.cidr, style: 'width: 160px' });
         const name = el('input', { type: 'text', placeholder: 'Name, e.g. Packaging line', maxlength: '100', style: 'width: 220px' });
         const error = el('p', { class: 'error-text' });
@@ -763,7 +767,7 @@
         list.replaceChildren(...(switches.length ? switches.map(sw => el('li', {},
             el('span', {}, el('strong', { text: sw.name }), el('br'),
                el('span', { class: 'hint', text: `${fmt(sw.ports)} ports, ${fmt(sw.macs)} MAC entries, ${fmt(sw.neighbors)} neighbors` })),
-            el('button', { class: 'link-btn danger', text: 'Remove', onclick: async () => {
+            !pyLot.canEdit ? null : el('button', { class: 'link-btn danger', text: 'Remove', onclick: async () => {
                 if (!confirm(`Remove the imported data for ${sw.name}?`)) return;
                 await sendJSON(`${API}/switches/${sw.id}`, 'DELETE');
                 loadPhysical();
@@ -795,7 +799,7 @@
             el('p', { class: 'hint', text: 'Only ports with something plugged in, a neighbor or the capture are drawn.' }));
     }
 
-    document.getElementById('switch-form').addEventListener('submit', async event => {
+    document.getElementById('switch-form')?.addEventListener('submit', async event => {
         event.preventDefault();
         const form = event.target;
         const error = document.getElementById('switch-error');

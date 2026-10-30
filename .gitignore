@@ -19,3 +19,6 @@ pylot.sqlite3-shm
 
 # Third-party ICS test captures, kept out of the repository
 ICS-DATA_DO-NOT-COMMIT/
+
+# HTTPS certificate made by --self-signed
+tls/
