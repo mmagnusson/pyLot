@@ -23,7 +23,7 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
 | `d952794` | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
 | `fb0e8ae` | Roadmap 8: accounts with viewer/analyst/admin roles (web pages and `auth.py` CLI), sign-in limits, HTTPS (own cert, self-signed, or behind a proxy); refuses to listen beyond localhost without an account and HTTPS |
-| (this branch) | Roadmap 7: asset inventory across sessions (matched by serial, MAC, then IP), sightings and identity changes, per-asset vulnerabilities, names, notes, merge and remove, CSV; host and device panels link to their asset |
+| `fb40b08` | Roadmap 7: asset inventory across sessions (matched by serial, MAC, then IP), sightings and identity changes, per-asset vulnerabilities, names, notes, merge and remove, CSV; host and device panels link to their asset |
 
 Tests: 262 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
