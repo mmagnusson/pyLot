@@ -22,7 +22,7 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `c171e2a` | Roadmap 3 and 5: industrial protocol decoders (Modbus/UMAS, DNP3, S7comm, EtherNet/IP and CIP, IEC 104, BACnet, SNMP, banners) giving operations and asset identity (vendor, model, firmware, serial) |
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
 | `d952794` | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
-| (this branch) | Roadmap 8: accounts with viewer/analyst/admin roles (web pages and `auth.py` CLI), sign-in limits, HTTPS (own cert, self-signed, or behind a proxy); refuses to listen beyond localhost without an account and HTTPS |
+| `fb0e8ae` | Roadmap 8: accounts with viewer/analyst/admin roles (web pages and `auth.py` CLI), sign-in limits, HTTPS (own cert, self-signed, or behind a proxy); refuses to listen beyond localhost without an account and HTTPS |
 
 Tests: 243 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
