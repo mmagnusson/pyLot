@@ -6,7 +6,7 @@ from parser import switch_config
 from capture import live_capture
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 import argparse
 import csv
@@ -20,6 +20,7 @@ import uuid
 import advisories
 import alerts
 import auth
+import inventory
 import storage
 
 logger = logging.getLogger(__name__)
@@ -179,6 +180,11 @@ def analyze_upload(session_id, filepath, discard_on_failure=True):
             analyzer = parse_file(filepath)
             storage.save_analysis(conn, session_id, analyzer)
             storage.update_session(conn, session_id, status='ready')
+            try:
+                inventory.sync(conn, [session_id])
+            except Exception:
+                # The session is fine without it; the inventory tries again when it is next opened
+                logger.exception("Couldn't add session %s to the inventory", session_id)
         except Exception as e:
             logger.exception("Failed to analyze %s", filepath)
             if not discard_on_failure:
@@ -333,6 +339,7 @@ def session_host(session_id, ip):
         host = storage.host_detail(conn, session_id, ip)
         if host is not None:
             host['vulnerabilities'] = advisories.match_hosts(conn, [host])
+            host['asset'] = inventory.asset_for(conn, session_id, ip=ip, mac=host['mac'])
     if host is None:
         abort(404)
     return jsonify(host)
@@ -387,6 +394,8 @@ def session_device(session_id, mac):
     with db() as conn:
         _session_or_404(conn, session_id)
         device = storage.device_detail(conn, session_id, mac.lower())
+        if device is not None:
+            device['asset'] = inventory.asset_for(conn, session_id, mac=device['mac'])
     if device is None:
         abort(404)
     return jsonify(device)
@@ -658,6 +667,70 @@ def users_delete(user_id):
             return users_page(error=f'{str(e).capitalize()}.', status=400)
     return users_page(message=f"Removed {user['username']}.")
 
+@app.template_filter('when')
+def format_time(timestamp):
+    if timestamp is None:
+        return ''
+    return datetime.fromtimestamp(timestamp, timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+@app.route('/inventory')
+def inventory_view():
+    return render_template('inventory.html')
+
+@app.route('/api/inventory')
+def inventory_list():
+    with db() as conn:
+        assets = inventory.list_assets(conn)
+        sessions = conn.execute("SELECT COUNT(*) FROM inventory_sessions").fetchone()[0]
+    return jsonify({'assets': assets, 'sessions': sessions})
+
+def asset_page(asset_id, message=None, error=None, status=200):
+    with db() as conn:
+        asset = inventory.get_asset(conn, asset_id)
+        if asset is None:
+            abort(404)
+        others = [{'id': a['id'], 'label': a['label']} for a in inventory.list_assets(conn) if a['id'] != asset_id]
+        existing = {row['id'] for row in conn.execute("SELECT id FROM sessions")}
+    return render_template('asset.html', asset=asset, others=others, existing_sessions=existing,
+                           message=message, error=error), status
+
+@app.route('/inventory/<int:asset_id>')
+def asset_view(asset_id):
+    return asset_page(asset_id)
+
+@app.route('/inventory/<int:asset_id>', methods=['POST'])
+def asset_update(asset_id):
+    with db() as conn:
+        try:
+            inventory.update_asset(conn, asset_id, request.form.get('name'), request.form.get('notes'))
+        except KeyError:
+            abort(404)
+        except ValueError as e:
+            return asset_page(asset_id, error=f'{str(e).capitalize()}.', status=400)
+    return asset_page(asset_id, message='Saved.')
+
+@app.route('/inventory/<int:asset_id>/merge', methods=['POST'])
+def asset_merge(asset_id):
+    try:
+        other = int(request.form.get('other', ''))
+    except ValueError:
+        return asset_page(asset_id, error='Choose the asset to merge into this one.', status=400)
+    with db() as conn:
+        try:
+            inventory.merge_assets(conn, asset_id, other)
+        except KeyError:
+            abort(404)
+        except ValueError as e:
+            return asset_page(asset_id, error=f'{str(e).capitalize()}.', status=400)
+    return asset_page(asset_id, message=f'Merged asset {other} into this one.')
+
+@app.route('/inventory/<int:asset_id>/delete', methods=['POST'])
+def asset_delete(asset_id):
+    with db() as conn:
+        if not inventory.delete_asset(conn, asset_id):
+            abort(404)
+    return redirect(url_for('inventory_view'))
+
 @app.route('/networks')
 def networks_view():
     return render_template('networks.html')
@@ -778,6 +851,18 @@ def export_vulnerabilities(session_id):
 
 DEVICE_CSV_COLUMNS = ['mac', 'vendor', 'name', 'ips', 'vlans', 'category', 'role', 'model', 'firmware', 'serial', 'layer2',
                       'switch', 'port', 'seen', 'packets', 'bytes', 'first_seen', 'last_seen']
+
+INVENTORY_CSV_COLUMNS = ['id', 'given_name', 'name', 'ips', 'all_ips', 'mac', 'mac_vendor', 'device_vendor', 'model', 'firmware',
+                         'serial', 'category', 'role', 'first_seen', 'last_seen', 'sessions', 'changes', 'vulnerabilities',
+                         'possible_vulnerabilities', 'notes']
+
+@app.route('/inventory.csv')
+def export_inventory():
+    with db() as conn:
+        assets = inventory.list_assets(conn)
+    for asset in assets:
+        asset['ips'], asset['all_ips'] = ' '.join(asset['ips']), ' '.join(asset['all_ips'])
+    return _csv(assets, INVENTORY_CSV_COLUMNS, 'inventory.csv')
 
 @app.route('/sessions/<int:session_id>/devices.csv')
 def export_devices(session_id):

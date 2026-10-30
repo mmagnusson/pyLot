@@ -36,6 +36,9 @@ Python web application.
   classify devices, including ones that never send IP traffic
 - Physical view: import Cisco switch output (running config, MAC address table, CDP/LLDP neighbors) to
   see which device is plugged into which port, how switches connect, and where the capture was taken
+- Asset inventory: every device across all sessions, recognized again by serial number, MAC or IP
+  address, with when it was first and last seen, each sighting, changes to its address, model,
+  firmware or serial number, and its known vulnerabilities; devices can be named, annotated and merged
 - Baseline comparison: new and missing hosts, MAC addresses and conversations, new industrial
   operations, new alerts and vulnerabilities, and hosts whose MAC, classification, model or firmware changed since a known-good capture, listed on a comparison page and marked on the graph
 - Sortable, searchable host, device and flow tables, a details panel for everything, and PNG, JSON
@@ -125,7 +128,10 @@ Python web application.
 5. **Check devices for known vulnerabilities (optional):** open Advisories from any page and use
    "Download from CISA", or import CSAF files there. See [Known vulnerabilities](#known-vulnerabilities).
 
-6. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
+6. **Keep track of devices over time:** every finished session adds the devices it saw to the asset
+   inventory (Asset inventory on the sessions page). See [Asset inventory](#asset-inventory).
+
+7. **Compare with a baseline:** use "Compare with a baseline" on a session, or Compare on the sessions
    list, and pick an earlier capture of the network in a known-good state. To see the changes on the
    graph instead, pick the baseline under "Changes since" on the Logical tab: new hosts and
    conversations are drawn in green, changed hosts in orange.
@@ -204,6 +210,25 @@ when its firmware wasn't seen or pyLot can't read the versions (about 8% of CISA
 Only devices that reported their model can be checked, so capture while an engineering tool or a
 discovery scan talks to them. Treat every match as a lead and confirm it against the advisory: a
 family-level match in particular may concern only some models of that family.
+
+### Asset inventory
+
+The inventory lists every device pyLot has seen, across all sessions, and keeps it when the session is
+deleted. Each finished session (an analyzed upload, or a stopped live capture) adds a sighting of each
+device it saw: one per MAC address, with the addresses it used and the identity it reported, plus one
+per private IP address reached through a router. Internet addresses aren't assets.
+
+A sighting joins the asset with the same serial number (from the same vendor), else the same MAC
+address, else the same IP address when either was only seen through a router. So a device keeps its
+entry when its address changes, while a replacement at the same address, with a new MAC, gets a new
+one. Asset pages list every sighting and every change to the device's addresses, MAC, vendor, model,
+firmware and serial number, which is how a firmware update, a swapped module or a device that moved
+shows up. Each asset is checked against the imported advisories with the identity it last reported.
+
+Analysts can name assets and add notes, merge two entries that are really the same device (for example
+one seen only through a router), and remove entries. The inventory filters to assets whose identity
+changed, vulnerable ones, and ones missing from the newest session, and downloads as CSV. A host's or
+device's panel in a session links to its asset.
 
 ### Zeek logs
 
@@ -303,6 +328,8 @@ The application uses SQLite (`pylot.sqlite3`) to store:
 - **switches**, **switch_ports**, **switch_macs**, **switch_neighbors**: imported switch data, per session
 - **networks** and **settings**: named networks and automatic grouping, shared by all sessions
   (settings also holds the key that signs sign-in cookies)
+- **assets**, **asset_observations** and **inventory_sessions**: the asset inventory, each asset's
+  sightings (kept when their session is deleted) and which sessions have been added to it
 - **users**: accounts, with salted password hashes, roles and when each last signed in
 - **advisories** and **advisory_products**: imported security advisories and the products they say
   are affected, shared by all sessions
@@ -346,6 +373,8 @@ Where the project stands and what's planned next is in `PROGRESS.md`.
 The application structure:
 - `app.py`: Main Flask application
 - `storage.py`: SQLite schema and queries
+- `inventory.py`: the asset inventory: sightings from each session, matching them to assets, and
+  identity changes
 - `auth.py`: accounts, roles, sign-in limits and self-signed certificates; also the command-line
   account manager
 - `alerts.py`: alert rules, worked out from a session's operations and flows when asked for

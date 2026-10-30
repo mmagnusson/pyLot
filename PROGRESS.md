@@ -23,15 +23,14 @@ grammar and confidence rules, sessions), then go beyond it for ICS/OT work.
 | `6350a64` | Roadmap 4: risky-activity alerts (13 rules, high/medium/low), Alerts tab, new alerts on the compare page |
 | `d952794` | Roadmap 6: vulnerability matching against CSAF advisories (CISA download or file import), Vulnerabilities tab, host panel section, new vulnerabilities on the compare page |
 | `fb0e8ae` | Roadmap 8: accounts with viewer/analyst/admin roles (web pages and `auth.py` CLI), sign-in limits, HTTPS (own cert, self-signed, or behind a proxy); refuses to listen beyond localhost without an account and HTTPS |
+| (this branch) | Roadmap 7: asset inventory across sessions (matched by serial, MAC, then IP), sightings and identity changes, per-asset vulnerabilities, names, notes, merge and remove, CSV; host and device panels link to their asset |
 
-Tests: 243 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
+Tests: 262 pass, 1 skipped (it needs a GRASSMARLIN checkout; see the README).
 
 ## Roadmap: what's left
 
-The roadmap agreed after Phase 3, in its original numbering. 1 to 6 and 8 are done.
+The roadmap agreed after Phase 3, in its original numbering. 1 to 8 are done.
 
-7. **Persistent asset inventory**: assets that outlive sessions, merged across captures by MAC,
-   serial or IP, with first and last seen and a history of identity changes.
 9. **Capture rotation and performance**: long-running live capture with ring files, and faster
    analysis of multi-million-packet captures (fingerprint matching and dpkt dominate the time).
 10. **Switch formats beyond Cisco**: Hirschmann, Siemens SCALANCE, Moxa, Juniper and others for the
@@ -39,8 +38,8 @@ The roadmap agreed after Phase 3, in its original numbering. 1 to 6 and 8 are do
 11. **Deployment**: Docker image and a systemd unit.
 12. **Reports**: a printable or PDF summary of a session: assets, identity, alerts, changes since a baseline.
 
-Suggested next: 7 (an asset inventory would let vulnerabilities and identity carry across sessions), or 11
-(a production server: pyLot still runs on Flask's built-in one).
+Suggested next: 11 (a production server, since pyLot still runs on Flask's built-in one, and serving the
+graph library locally for isolated networks), or 12 (reports, which can now draw on the inventory).
 
 ## Known gaps in what's built
 
@@ -63,6 +62,13 @@ Suggested next: 7 (an asset inventory would let vulnerabilities and identity car
   - The sign-in limit is per address and kept in memory, so it resets on restart.
   - The session graph loads Cytoscape from CDNs, so on an isolated network its browser needs those
     files served locally (worth fixing with item 11).
+- **Inventory**:
+  - Live captures join the inventory when stopped, not while running.
+  - Chassis modules (a ControlLogix's cards) are part of their host's sighting, not assets of their own.
+  - Assets can be merged but not split. If matching wrongly joins two devices (say, two that report
+    the same serial number), the only remedy is removing the asset.
+  - The Model column shows what fingerprints guess when a device never reported its model, which can be
+    a list of candidates (as on session pages).
 - **Zeek imports**: no operations, identity or alerts, since conn.log has no payloads.
 - **Modbus identity**: Read Device Identification replies are covered only by unit tests; none of the test captures has a successful one.
 

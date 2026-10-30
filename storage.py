@@ -185,6 +185,38 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS assets (      -- the inventory: devices tracked across sessions (see inventory.py)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,                           -- given by a user
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS asset_observations (  -- an asset as one session saw it; kept when the session is deleted
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    session_id INTEGER REFERENCES sessions(id) ON DELETE SET NULL,
+    session_name TEXT NOT NULL,
+    mac TEXT,
+    ips TEXT NOT NULL,                   -- space-separated, '' for devices seen only at layer 2
+    mac_vendor TEXT,
+    device_vendor TEXT,
+    model TEXT,
+    firmware TEXT,
+    serial TEXT,
+    name TEXT,                           -- what the device calls itself (LLDP system name, PROFINET station name)
+    category TEXT,
+    role TEXT,
+    properties TEXT NOT NULL,            -- JSON: the identity properties, for matching advisories
+    first_seen REAL,
+    last_seen REAL,
+    packets INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS asset_observations_asset ON asset_observations (asset_id);
+CREATE INDEX IF NOT EXISTS asset_observations_session ON asset_observations (session_id);
+CREATE TABLE IF NOT EXISTS inventory_sessions (  -- sessions already added to the inventory
+    session_id INTEGER PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
+    recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 CREATE TABLE IF NOT EXISTS users (       -- accounts; while there are none, pyLot asks no one to sign in
     id INTEGER PRIMARY KEY,
     username TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -294,6 +326,8 @@ def reset_analysis(conn, session_id):
         if claimed:
             for table in ANALYSIS_TABLES:
                 conn.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
+            # Added to the inventory again once analyzed; its old observations stay until then, so assets keep their identity
+            conn.execute("DELETE FROM inventory_sessions WHERE session_id = ?", (session_id,))
     return bool(claimed)
 
 def reanalyzable_sessions(conn):

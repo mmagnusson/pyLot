@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Inventory - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% include '_account.html' %}
+<div class="page wide">
+    <nav class="top-nav"><a href="/">← Sessions</a> <a href="{{ url_for('networks_view') }}">Networks</a> <a href="{{ url_for('advisories_view') }}">Advisories</a></nav>
+
+    <div class="card section">
+        <h1>Asset inventory</h1>
+        <p class="hint">Every device pyLot has seen, across all sessions, including sessions that have since been deleted.
+           A device is recognized again by its serial number, MAC address or IP address, in that order, so a device keeps
+           its entry when its address changes, and a replacement at the same address gets a new one. Internet
+           addresses are left out. Click an asset for its history, identity changes and known vulnerabilities.</p>
+        <div id="summary" class="summary-grid"></div>
+        <div class="form-row toolbar-row">
+            <input type="search" id="filter" placeholder="Filter by name, address, MAC, vendor, model, firmware, serial…" style="flex: 1; min-width: 240px">
+            <label><input type="checkbox" id="only-changed"> Changed identity</label>
+            <label><input type="checkbox" id="only-vulnerable"> Vulnerable</label>
+            <label><input type="checkbox" id="only-missing"> Not in the newest session</label>
+            <a class="btn secondary" href="{{ url_for('export_inventory') }}">CSV</a>
+        </div>
+        <div id="assets"><p class="hint">Loading…</p></div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='common.js') }}"></script>
+<script src="{{ url_for('static', filename='inventory.js') }}"></script>
+</body>
+</html>

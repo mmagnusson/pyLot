@@ -14,6 +14,7 @@
     <nav class="top-nav">
         <a href="/">← Sessions</a>
         <a href="{{ url_for('networks_view') }}">Networks</a>
+        <a href="{{ url_for('inventory_view') }}">Inventory</a>
         <a href="{{ url_for('advisories_view') }}">Advisories</a>
         <a href="{{ url_for('compare_view', session_id=session.id) }}">Compare with a baseline</a>
     </nav>

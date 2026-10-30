@@ -515,6 +515,15 @@
                 table([{ key: 'what', label: 'What' }, { key: 'before', label: 'Before' }, { key: 'now', label: 'Now' }], host.changes)];
     }
 
+    // Where the host or device is in the inventory, and how long it has been around
+    function assetLine(asset) {
+        if (!asset) return null;
+        const history = asset.sessions > 1
+            ? `seen in ${fmt(asset.sessions)} sessions since ${when(asset.first_seen)}` : 'first seen in this session';
+        return el('p', { class: 'hint' }, 'Inventory: ', el('a', { href: `/inventory/${asset.id}`, text: asset.label }), `, ${history}`,
+            asset.changes ? el('span', { class: 'status-possible', text: ` ${fmt(asset.changes)} identity change${asset.changes > 1 ? 's' : ''}` }) : null);
+    }
+
     async function showHostPanel(ip) {
         openPanel(ip, el('p', { text: 'Loading…' }));
         let host;
@@ -526,6 +535,7 @@
         }
         const properties = Object.entries(host.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(ip,
+            assetLine(host.asset),
             ...baselineChanges(ip),
             ...alertsSection(host.alerts),
             ...identitySection(host),
@@ -829,6 +839,7 @@
         }
         const properties = Object.entries(device.properties).map(([name, p]) => ({ name, values: p.values.join(', '), confidence: p.confidence }));
         openPanel(device.name ? `${device.name} (${mac})` : mac,
+            assetLine(device.asset),
             facts([['Vendor', device.vendor], ['Switch port', device.switch ? `${device.switch} ${device.port}` : null],
                    ['VLANs', device.vlans.join(', ')], ['Routes for', device.routes_for ? `${fmt(device.routes_for)} hosts on other networks` : null],
                    ['Frames sent', device.seen ? fmt(device.packets) : 'Not seen in the capture, only in an imported MAC table'],

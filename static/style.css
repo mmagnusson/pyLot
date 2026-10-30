@@ -467,3 +467,35 @@ form.stacked input, form.stacked select {
 form.stacked .btn {
     align-self: flex-start;
 }
+.page.wide {
+    max-width: 1400px;
+}
+.toolbar-row {
+    margin: 14px 0 6px;
+}
+table.data tr.faded td {
+    color: #888;
+}
+dl.facts-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 18px;
+    margin: 0;
+}
+dl.facts-list dt {
+    color: #666;
+}
+dl.facts-list dd {
+    margin: 0;
+    word-break: break-word;
+}
+form.stacked textarea {
+    font: inherit;
+    padding: 6px 8px;
+    min-height: 70px;
+}
+#assets table.data td {
+    max-width: 220px;
+    white-space: normal;
+    overflow-wrap: break-word;
+}

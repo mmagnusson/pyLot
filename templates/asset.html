@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{{ asset.label }} - pyLot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% include '_account.html' %}
+<div class="page wide">
+    <nav class="top-nav"><a href="/">← Sessions</a> <a href="{{ url_for('inventory_view') }}">Inventory</a></nav>
+
+    <div class="card section">
+        <h1>{{ asset.label }}</h1>
+        {% if message %}<p class="notice">{{ message }}</p>{% endif %}
+        {% if error %}<p class="notice error">{{ error }}</p>{% endif %}
+        <dl class="facts-list">
+            {% for label, value in [
+                ('Asset', asset.id), ('IP addresses', asset.ips | join(', ')),
+                ('Earlier addresses', (asset.all_ips | reject('in', asset.ips) | join(', '))),
+                ('MAC', (asset.mac ~ (' (' ~ asset.mac_vendor ~ ')' if asset.mac_vendor else '')) if asset.mac else ''),
+                ('Vendor', asset.device_vendor), ('Model', asset.model), ('Firmware', asset.firmware), ('Serial', asset.serial),
+                ('Device name', asset.name), ('Category', asset.category), ('Role', asset.role),
+                ('First seen', asset.first_seen | when), ('Last seen', asset.last_seen | when), ('Sessions', asset.sessions)] %}
+            {% if value %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endif %}
+            {% endfor %}
+        </dl>
+        {% if asset.notes and not can('analyst') %}<h3>Notes</h3><p style="white-space: pre-wrap">{{ asset.notes }}</p>{% endif %}
+    </div>
+
+    {% if can('analyst') %}
+    <div class="card section">
+        <h2>Name and notes</h2>
+        <form method="post" action="{{ url_for('asset_update', asset_id=asset.id) }}" class="stacked" style="max-width: 600px">
+            <label>Name <input type="text" name="name" maxlength="100" value="{{ asset.given_name or '' }}" placeholder="e.g. Line 2 filler PLC"></label>
+            <label>Notes <textarea name="notes" maxlength="5000" placeholder="Location, owner, change tickets…">{{ asset.notes or '' }}</textarea></label>
+            <button type="submit" class="btn">Save</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="card section">
+        <h2>Known vulnerabilities</h2>
+        {% if asset.vulnerabilities %}
+        <p class="hint">Advisories matching the identity this device last reported. Treat each as a lead to confirm against the advisory.</p>
+        <div class="table-wrap"><table class="data">
+            <thead><tr><th>Status</th><th>Score</th><th>Advisory</th>{% if asset.vulnerabilities | selectattr('module') | list %}<th>Module</th>{% endif %}<th>Matched by</th><th>Why</th><th>Fix</th></tr></thead>
+            <tbody>
+            {% for v in asset.vulnerabilities %}
+            <tr>
+                <td><span class="status-{{ v.status }}">{{ 'affected' if v.status == 'affected' else 'possibly affected' }}</span></td>
+                <td class="num"><span class="severity severity-{{ v.severity }}">{{ v.score if v.score is not none else '' }} {{ v.severity }}</span></td>
+                <td>{% if v.url and v.url.startswith('https://') %}<a href="{{ v.url }}" target="_blank" rel="noopener noreferrer">{{ v.advisory }}</a>{% else %}{{ v.advisory }}{% endif %}<br><span class="hint">{{ v.title }}</span></td>
+                {% if asset.vulnerabilities | selectattr('module') | list %}<td>{{ v.module or '' }}</td>{% endif %}
+                <td>{{ v.match }}</td>
+                <td>{{ v.reason }}</td>
+                <td>{{ v.fix or '' }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% elif asset.model %}
+        <p class="hint">None of the imported advisories match. <a href="{{ url_for('advisories_view') }}">Manage advisories</a></p>
+        {% else %}
+        <p class="hint">This device hasn't reported its model, so it can't be checked against advisories.</p>
+        {% endif %}
+    </div>
+
+    <div class="card section">
+        <h2>Identity changes</h2>
+        {% if asset.changes %}
+        <div class="table-wrap"><table class="data">
+            <thead><tr><th>Seen</th><th>What</th><th>Before</th><th>After</th><th>Session</th></tr></thead>
+            <tbody>
+            {% for c in asset.changes %}
+            <tr><td>{{ c.seen | when }}</td><td>{{ c.label }}</td><td>{{ c.old }}</td><td>{{ c.new }}</td>
+                <td>{% if c.session_id in existing_sessions %}<a href="{{ url_for('session_view', session_id=c.session_id) }}">{{ c.session_name }}</a>{% else %}{{ c.session_name }} <span class="hint">(deleted)</span>{% endif %}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}
+        <p class="hint">None: its addresses, vendor, model, firmware and serial number are the same in every session that saw them.</p>
+        {% endif %}
+    </div>
+
+    <div class="card section">
+        <h2>Sightings</h2>
+        <div class="table-wrap"><table class="data">
+            <thead><tr><th>Session</th><th>First seen</th><th>Last seen</th><th>IP addresses</th><th>MAC</th><th>Model</th><th>Firmware</th><th>Serial</th><th style="text-align: right">Packets</th></tr></thead>
+            <tbody>
+            {% for o in asset.sightings %}
+            <tr>
+                <td>{% if o.session_id in existing_sessions %}<a href="{{ url_for('session_view', session_id=o.session_id) }}">{{ o.session_name }}</a>{% else %}{{ o.session_name }} <span class="hint">(deleted)</span>{% endif %}</td>
+                <td>{{ o.first_seen | when }}</td><td>{{ o.last_seen | when }}</td><td>{{ o.ips | join(', ') }}</td>
+                <td>{{ o.mac or '' }}</td><td>{{ o.model or '' }}</td><td>{{ o.firmware or '' }}</td><td>{{ o.serial or '' }}</td>
+                <td class="num">{{ '{:,}'.format(o.packets) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+    </div>
+
+    {% if can('analyst') %}
+    <div class="card section">
+        <h2>Merge or remove</h2>
+        {% if others %}
+        <p class="hint">If another entry is really this same device (pyLot couldn't tell, say, because it was only seen
+           through a router), merge it into this one: its sightings move here and it disappears.</p>
+        <form method="post" action="{{ url_for('asset_merge', asset_id=asset.id) }}" class="form-row"
+              onsubmit="return confirm('Merge the chosen asset into this one?')">
+            <select name="other" required>
+                <option value="">Choose an asset…</option>
+                {% for o in others %}<option value="{{ o.id }}">{{ o.label }} (asset {{ o.id }})</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn secondary">Merge into this asset</button>
+        </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('asset_delete', asset_id=asset.id) }}" style="margin-top: 14px"
+              onsubmit="return confirm('Remove this asset and its history? A later capture that sees it adds it again.')">
+            <button type="submit" class="btn danger">Remove from the inventory</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>
